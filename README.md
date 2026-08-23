@@ -1,4 +1,6 @@
-# cresome.tech-HP
+# www.cresome.tech
+
+リポジトリ名変更(2026-08-24) : cresome.tech-HP -> www.cresome.tech
 
 クリサム株式会社（Cresome Technical Works）のコーポレートサイト。
 GitHub Pages（[https://www.cresome.tech](https://www.cresome.tech)、CNAME: `www.cresome.tech`）で公開しています。
