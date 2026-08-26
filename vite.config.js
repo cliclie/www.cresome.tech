@@ -18,6 +18,14 @@ import { resolve } from 'node:path';
 // ビルドが失敗するため、root を realpath に固定する。
 const root = realpathSync(resolve(process.cwd()));
 
+// 同じジョクション環境では `npm run dev` もクラッシュする:
+// esbuild の metafile パスは解決後（realpath）の cwd 基準の相対パスになる一方、
+// Vite の依存関係最適化は元の（ジョクション）cwd 基準で期待パスを計算するため
+// 照合に失敗し、「TypeError: Cannot read properties of undefined
+// (reading 'imports')」でサーバーが死ぬ。
+// process.chdir(root) で process.cwd() を root と揃えることで回避する。
+process.chdir(root);
+
 export default defineConfig({
   root,
   base: './',
