@@ -37,7 +37,8 @@ body {
   padding: 40px 26px 30px;
   display: flex;
   flex-direction: column;
-  background: var(--bg);
+  /* 背景は透明にして、奥（z-0）の波線がサイドバー内でも貫通するようにする */
+  background: transparent;
 }
 .brand img { height: 27px; width: auto; display: block; }
 .brand-name {
@@ -184,6 +185,14 @@ body {
   min-height: 100vh;
 }
 .page-wrap { width: 100%; max-width: 820px; margin: 0 auto; }
+
+/* ---------- Wave background (decorative, lines only) ---------- */
+.wave-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
 
 /* ---------- Pages & transitions ---------- */
 .page { display: none; }

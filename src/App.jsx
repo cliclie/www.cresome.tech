@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
 import Drawer from './components/Drawer';
+import WaveBackground from './components/WaveBackground';
 import Home from './pages/Home';
 import Business from './pages/Business';
 import Flow from './pages/Flow';
@@ -66,6 +67,7 @@ export default function App() {
 
   return (
     <>
+      <WaveBackground />
       <Sidebar items={navItems} onSelect={showPage} />
       <Topbar onMenu={() => setDrawerOpen(true)} />
       <Drawer

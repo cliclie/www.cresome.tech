@@ -66,7 +66,36 @@ publish ブランチには以下のファイルのみ存在します:
 - アクセント: `#EF5B00`
 - 詳細は [design.md](./design.md) を参照
 
+## 追加機能予定: 背景の波線エフェクト
+
+ページの背景に、ゆるやかに動く波線のエフェクトを追加する計画です。
+2026-08-24 に実装可能性を確認し、**既存の Vite + React 環境で新規依存ライブラリなしに実装可能**と判断しました。
+
+- **デザイン（要件）**:
+  - 塗りつぶしはせず、**薄い灰色の線のみ**（線引き描画）で波線を表す
+  - 波線は **3 本程度**（本数は調整可）
+  - 3 本で位置・振幅・波長・速度をずらし、重なりが自然に見えるようにする
+- **技術構成（予定）**:
+  - Canvas 2D API + 原生 JS（`requestAnimationFrame` ループ）でサイン波を描画
+  - 新コンポーネント `src/components/WaveBackground.jsx` を作成し `App.jsx` でマウント
+  - 全体を覆う canvas を `position: fixed; inset: 0; z-index: 0; pointer-events: none` で配置
+    （z 軸では既存レイヤー `.main`(z-1) / サイドバー・トップバー(z-40) / ドロワー(z-50) のすべてより奥に配置されるため、既存 UI への変更は不要。カード等は白背景のため本文の可読性は維持）
+  - 各波線は `strokeStyle`（薄い灰色）+ `lineWidth` のみの線引き描画（`fill` 不使用）で、位相・振幅・波長・速度・透明度を個別設定
+- **品質・性能（予定）**:
+  - `devicePixelRatio` による解像度補正（線のはれ防止）とリサイズ時のキャンバス再構築
+  - `prefers-reduced-motion` 指定時はアニメーションを止め、静的な波線のみ表示
+  - タブ非表示時は描画を停止（`requestAnimationFrame` の自動停止 + クリーンアップで `cancelAnimationFrame`）
+  - 1 フレーム 3 本の線引き描画のため描画負荷は軽微
+- **デプロイ**: 既存の `npm run deploy`（build → `publish` ブランチ worktree へ配置 → push）で対応し、GitHub Pages 設定の変更は不要
+
 ## 作業記録
+
+### 2026-08-24: `npm run dev` クラッシュの修正（vite.config.js に `process.chdir(root)` を追加）
+
+- **症状**: `npm run dev` 起動直後に `TypeError: Cannot read properties of undefined (reading 'imports')`（Vite の依存関係最適化処理）でサーバーがクラッシュする、またはサイレントに依存最適化が死に `node_modules/.vite` が生成されない状態になる
+- **原因**: ワークスペースがジョクション経由（`d:\cresome.tech` → `D:\SynologyDrive\...`）で開かれている環境では、esbuild の metafile パス（解決後 = realpath の cwd 基準の相対パス）と、Vite の依存関係最適化が元の（ジョクション）cwd 基準で計算する期待パスが一致せず、照合に失敗する
+- **修正**: `vite.config.js` で `process.chdir(root)` を呼び、`process.cwd()` を `root`（realpath）と揃える（既存の root 固定設定を補完する追加）
+- **検証（実施済み）**: 依存関係最適化が完了し `node_modules/.vite/deps` が生成される、`/` と `/src/main.jsx` が 200 を返し最適化済み deps への参照になる、`npm run build` も引き続き成功すること
 
 ### 2026-08-24: リポジトリ名変更 (cresome.tech-HP -> www.cresome.tech) と旧名ワークスペースの整理
 
