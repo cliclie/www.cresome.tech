@@ -42,6 +42,8 @@ npm run deploy     # build → 公開ファイル（index.html + assets/ + CNAME
 publish ブランチには以下のファイルのみ存在します:
 - `index.html`
 - `assets/`（JS / CSS / logo / favicon）
+- `CNAME`
+- `public/` 配下の静的ファイル（Google Search Console 検証ファイル `google6053776ad251d250.html` など。Vite がビルド時に `dist/` ルートへ自動コピーするため、`npm run deploy` で自動的に同梱されます）
 
 ## 留意事項: アセットファイル名のビルド再現性
 
@@ -89,6 +91,19 @@ publish ブランチには以下のファイルのみ存在します:
 - **デプロイ**: 既存の `npm run deploy`（build → `publish` ブランチ worktree へ配置 → push）で対応し、GitHub Pages 設定の変更は不要
 
 ## 作業記録
+
+### 2026-08-27: Google Search Console 検証ファイルをビルド出力（`public/`）に組み込み
+
+- **背景**: Google Search Console の検証ファイル `google6053776ad251d250.html` を急ぎで公開するため、`npm run deploy` を経由せず `main`（`3dd2c42`）と `publish`（`df00071`）に個別に手動 push した。その際、検証ファイルはビルド成果物 `dist/` に含まれておらず、`scripts/deploy.mjs` が「publish worktree 全削除 → `dist/*` + `CNAME` のみコピー」を行うため、次回 `npm run deploy` 実行時に **publish ブランチ上の検証ファイルが削除されてしまう**（Google 検証の破損 + main→publish の一貫性喪失）という問題が起きた
+- **修正内容**:
+  1. 検証ファイルをリポジトリ直下から `public/` へ移動（`git mv google6053776ad251d250.html public/google6053776ad251d250.html`）
+  2. Vite は `public/` 配下のファイルを `dist/` ルートへ自動コピーするため、以降の `npm run deploy` は検証ファイルを publish 出力に常に同梱する（`scripts/deploy.mjs` の処理ロジックは変更なし、構成説明コメントのみ更新）
+  3. 本 README の「publish ブランチのファイル一覧」を更新（`CNAME` と `public/` 配下ファイルの記載を追加）
+- **修正後の検証（予定）**:
+  1. `npm run deploy` を実行
+  2. `origin/publish` に `google6053776ad251d250.html` が存在することを確認
+  3. `npm run deploy` を繰り返しても検証ファイルが消えないこと（worktree 内容と push 対象が一致するため「変更なし」でスキップされることを確認）
+  4. https://www.cresome.tech/google6053776ad251d250.html が 200 を返すことを確認
 
 ### 2026-08-24: `npm run dev` クラッシュの修正（vite.config.js に `process.chdir(root)` を追加）
 

@@ -3,7 +3,9 @@
  *
  * 構成:
  *   - main    = ソース専用（web 公開されない）
- *   - publish = 公開ファイルのみ（index.html + assets/ + CNAME）
+ *   - publish = 公開ファイルのみ（index.html + assets/ + CNAME
+ *               + public/ 配下の静的ファイル（Google Search Console 検証ファイルなど、
+ *                 Vite がビルド時に dist/ ルートへ自動コピーするため dist/* に同梱される））
  *   - GitHub Pages 設定: Source → Deploy from branch → publish / /
  *
  * 前提:
