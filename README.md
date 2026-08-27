@@ -85,62 +85,6 @@ publish ブランチには以下のファイルのみ存在します:
 
 ## 作業記録
 
-### 2026-08-27: `.gitignore` に `.clinerules/01-always.md` を追加
-
-- **変更** (`311eb5d`): `.clinerules/01-always.md`（AI ツール用の編集ルールファイル）を Git の管理対象外とし `.gitignore` に追加
-- **検証（実施済み）**: `git check-ignore -v` で `.gitignore` の該当ルールにヒットすること、および `git status` で未追跡ファイルから消えたことを確認
-
-### 2026-08-27: README 整理（「追加機能予定: 背景の波線エフェクト」セクションを実装状況に整合）
-
-- **背景**: README の「追加機能予定: 背景の波線エフェクト」セクションが当初の計画（「薄い灰色の線 3 本・線引き描画」）のまま実装済みの 3D 点波形エフェクト（`bf9459b` / `e7f9f33`）と乖離していた。また波エフェクトの実装作業自体に作業記録のエントリがなかった
-- **変更内容** (`d6c7b37`):
-  1. 該当セクションを「背景エフェクト」に変更し、実装内容（`WaveBackground.jsx`・透視投影の点グリッド・サイン波 4 種合成・2 層描画のグロー・距離フェード等）と整合
-  2. 「サイト構成」に背景エフェクトの項目を追加
-  3. 波エフェクトの実装・刷新の作業記録エントリを追加
-- **検証（実施済み）**: README 全体を読み返し整合性を確認。README のみの変更（ソース変更なし）のため再ビルド・再デプロイは不要
-
-### 2026-08-27: Google Search Console 検証ファイルをビルド出力（`public/`）に組み込み
-
-- **背景**: Google Search Console の検証ファイル `google6053776ad251d250.html` を急ぎで公開するため、`npm run deploy` を経由せず `main`（`3dd2c42`）と `publish`（`df00071`）に個別に手動 push した。その際、検証ファイルはビルド成果物 `dist/` に含まれておらず、`scripts/deploy.mjs` が「publish worktree 全削除 → `dist/*` + `CNAME` のみコピー」を行うため、次回 `npm run deploy` 実行時に **publish ブランチ上の検証ファイルが削除されてしまう**（Google 検証の破損 + main→publish の一貫性喪失）という問題が起きた
-- **修正内容**:
-  1. 検証ファイルをリポジトリ直下から `public/` へ移動（`git mv google6053776ad251d250.html public/google6053776ad251d250.html`）
-  2. Vite は `public/` 配下のファイルを `dist/` ルートへ自動コピーするため、以降の `npm run deploy` は検証ファイルを publish 出力に常に同梱する（`scripts/deploy.mjs` の処理ロジックは変更なし、構成説明コメントのみ更新）
-  3. 本 README の「publish ブランチのファイル一覧」を更新（`CNAME` と `public/` 配下ファイルの記載を追加）
-- **修正後の検証（実施済み）**:
-  1. `npm run deploy` を実行 → ビルド成功（vite 5.4.21）、`dist/` に `public/` 由来の `google6053776ad251d250.html` が同梱されることを確認
-  2. `origin/publish` に `google6053776ad251d250.html` が存在することを確認（`df00071`、`git ls-tree -r origin/publish` で確認）
-  3. `npm run deploy` の worktree 投入後に「公開ファイルに変更はありません。commit/push はスキップしました。」と表示され、publish ブランチがビルド出力と完全一致することを確認（以降のデプロイでも検証ファイルが消えない）
-  4. https://www.cresome.tech/google6053776ad251d250.html が 200 を返し、内容が `google-site-verification: google6053776ad251d250.html` であることを確認
-
-### 2026-08-27: 背景エフェクトを実装し 3D 点波形へ刷新（WaveBackground）
-
-- **実装** (`bf9459b`): `src/components/WaveBackground.jsx` を新規作成し `App.jsx` でマウント。Canvas 2D + 原生 JS（`requestAnimationFrame` ループ）で背景エフェクトを描画（新規依存ライブラリなし）。
-- **刷新** (`e7f9f33`): 当初案の「3 本の薄い波線（線引き描画）」から、透視投影した 3D の点グリッド波形へ置き換え（サイン波 4 種合成・点は薄い灰色で山ほど濃く大きく／谷は淡く・距離によるフェード・グロー表現は `shadowBlur` ではなく 2 層描画で代用）。
-- **配置**: `.wave-bg`（`position: fixed; inset: 0; z-index: 0; pointer-events: none`）でコンテンツより奥に表示。既存 UI への変更は不要。
-
-### 2026-08-24: `npm run dev` クラッシュの修正（vite.config.js に `process.chdir(root)` を追加）
-
-- **症状**: `npm run dev` 起動直後に `TypeError: Cannot read properties of undefined (reading 'imports')`（Vite の依存関係最適化処理）でサーバーがクラッシュする、またはサイレントに依存最適化が死に `node_modules/.vite` が生成されない状態になる
-- **原因**: ワークスペースがジョクション経由（`d:\cresome.tech` → `D:\SynologyDrive\...`）で開かれている環境では、esbuild の metafile パス（解決後 = realpath の cwd 基準の相対パス）と、Vite の依存関係最適化が元の（ジョクション）cwd 基準で計算する期待パスが一致せず、照合に失敗する
-- **修正**: `vite.config.js` で `process.chdir(root)` を呼び、`process.cwd()` を `root`（realpath）と揃える（既存の root 固定設定を補完する追加）
-- **検証（実施済み）**: 依存関係最適化が完了し `node_modules/.vite/deps` が生成される、`/` と `/src/main.jsx` が 200 を返し最適化済み deps への参照になる、`npm run build` も引き続き成功すること
-
-### 2026-08-24: リポジトリ名変更 (cresome.tech-HP -> www.cresome.tech) と旧名ワークスペースの整理
-
-- **変更内容**:
-  1. GitHub リポジトリ名を `www.cresome.tech` に変更し、ローカルのワークスペースフォルダも `www.cresome.tech` に変更した（remote: `https://github.com/cliclie/www.cresome.tech.git`）
-  2. 改名に伴い不要になった旧名由来のディレクトリ（親ディレクトリ `D:\SynologyDrive\cresome.tech\` 配下）を削除した:
-     - `cresome-hp/` — 旧作業コピー。git remote は旧名 `cresome.tech-HP` のままで main が新ワークスペースより 1 コミット遅れ（`6a3ba93`）。削除前に未コミット変更・stash・固有コミットのいずれも無いことを確認済み
-     - `cresome-hp-publish-wt/` — 旧 publish ワークツリー。HEAD（`44f1b28`）は `origin/publish` と同一で固有データなし。削除前に未コミット変更が無いことを確認済み
-  3. 本作業記録下方の旧 GitHub URL（`cresome.tech-HP/settings/pages`）に変更後の新 URL への注記を追加（元記載は残したまま追記）
-- **変更後の検証（実施済み）**:
-  1. `git remote -v` が新名に更新済み、main は `origin/main` と同期、作業ツリーはクリーン、`git fsck` に問題なし
-  2. `origin/publish`（公開内容）およびリポジトリ全体のソース・スクリプト・設定に旧名参照が残っていないことを確認
-  3. 旧 GitHub URL は GitHub の自動リダイレクト（301）で新 URL に移動すること、新 URL は正常（200）であることを確認
-- **留意事項**:
-  - `scripts/deploy.mjs` は publish ワークツリーのパスをフォルダ名から導出するため、改名後は新しいワークツリー `www.cresome.tech-publish-wt` が作成・使用される（旧 `cresome-hp-publish-wt` は参照されない）
-  - 旧 URL（`cresome.tech-HP/...`）は自動リダイレクトにより開けるが、今後は新 URL を使用すること
-
 ### 2026-08-22: README.md の実装との整合性確認・修正
 
 実装（`package.json` / `vite.config.js` / `tailwind.config.js` / `scripts/` / `src/` / `CNAME`）を正として README.md を照合し、以下の不一致を修正しました。
@@ -173,3 +117,59 @@ publish ブランチには以下のファイルのみ存在します:
   2. **Source: Deploy from a branch** を選択し、Branch を **`publish`**、フォルダを **`/ (root)`** に変更して保存
   3. 数分待って [https://www.cresome.tech/](https://www.cresome.tech/) でサイト表示を確認
   4. [https://www.cresome.tech/README.md](https://www.cresome.tech/README.md) が **404** になることを確認
+
+### 2026-08-24: リポジトリ名変更 (cresome.tech-HP -> www.cresome.tech) と旧名ワークスペースの整理
+
+- **変更内容**:
+  1. GitHub リポジトリ名を `www.cresome.tech` に変更し、ローカルのワークスペースフォルダも `www.cresome.tech` に変更した（remote: `https://github.com/cliclie/www.cresome.tech.git`）
+  2. 改名に伴い不要になった旧名由来のディレクトリ（親ディレクトリ `D:\SynologyDrive\cresome.tech\` 配下）を削除した:
+     - `cresome-hp/` — 旧作業コピー。git remote は旧名 `cresome.tech-HP` のままで main が新ワークスペースより 1 コミット遅れ（`6a3ba93`）。削除前に未コミット変更・stash・固有コミットのいずれも無いことを確認済み
+     - `cresome-hp-publish-wt/` — 旧 publish ワークツリー。HEAD（`44f1b28`）は `origin/publish` と同一で固有データなし。削除前に未コミット変更が無いことを確認済み
+  3. 本作業記録下方の旧 GitHub URL（`cresome.tech-HP/settings/pages`）に変更後の新 URL への注記を追加（元記載は残したまま追記）
+- **変更後の検証（実施済み）**:
+  1. `git remote -v` が新名に更新済み、main は `origin/main` と同期、作業ツリーはクリーン、`git fsck` に問題なし
+  2. `origin/publish`（公開内容）およびリポジトリ全体のソース・スクリプト・設定に旧名参照が残っていないことを確認
+  3. 旧 GitHub URL は GitHub の自動リダイレクト（301）で新 URL に移動すること、新 URL は正常（200）であることを確認
+- **留意事項**:
+  - `scripts/deploy.mjs` は publish ワークツリーのパスをフォルダ名から導出するため、改名後は新しいワークツリー `www.cresome.tech-publish-wt` が作成・使用される（旧 `cresome-hp-publish-wt` は参照されない）
+  - 旧 URL（`cresome.tech-HP/...`）は自動リダイレクトにより開けるが、今後は新 URL を使用すること
+
+### 2026-08-24: `npm run dev` クラッシュの修正（vite.config.js に `process.chdir(root)` を追加）
+
+- **症状**: `npm run dev` 起動直後に `TypeError: Cannot read properties of undefined (reading 'imports')`（Vite の依存関係最適化処理）でサーバーがクラッシュする、またはサイレントに依存最適化が死に `node_modules/.vite` が生成されない状態になる
+- **原因**: ワークスペースがジョクション経由（`d:\cresome.tech` → `D:\SynologyDrive\...`）で開かれている環境では、esbuild の metafile パス（解決後 = realpath の cwd 基準の相対パス）と、Vite の依存関係最適化が元の（ジョクション）cwd 基準で計算する期待パスが一致せず、照合に失敗する
+- **修正**: `vite.config.js` で `process.chdir(root)` を呼び、`process.cwd()` を `root`（realpath）と揃える（既存の root 固定設定を補完する追加）
+- **検証（実施済み）**: 依存関係最適化が完了し `node_modules/.vite/deps` が生成される、`/` と `/src/main.jsx` が 200 を返し最適化済み deps への参照になる、`npm run build` も引き続き成功すること
+
+### 2026-08-27: 背景エフェクトを実装し 3D 点波形へ刷新（WaveBackground）
+
+- **実装** (`bf9459b`): `src/components/WaveBackground.jsx` を新規作成し `App.jsx` でマウント。Canvas 2D + 原生 JS（`requestAnimationFrame` ループ）で背景エフェクトを描画（新規依存ライブラリなし）。
+- **刷新** (`e7f9f33`): 当初案の「3 本の薄い波線（線引き描画）」から、透視投影した 3D の点グリッド波形へ置き換え（サイン波 4 種合成・点は薄い灰色で山ほど濃く大きく／谷は淡く・距離によるフェード・グロー表現は `shadowBlur` ではなく 2 層描画で代用）。
+- **配置**: `.wave-bg`（`position: fixed; inset: 0; z-index: 0; pointer-events: none`）でコンテンツより奥に表示。既存 UI への変更は不要。
+
+### 2026-08-27: Google Search Console 検証ファイルをビルド出力（`public/`）に組み込み
+
+- **背景**: Google Search Console の検証ファイル `google6053776ad251d250.html` を急ぎで公開するため、`npm run deploy` を経由せず `main`（`3dd2c42`）と `publish`（`df00071`）に個別に手動 push した。その際、検証ファイルはビルド成果物 `dist/` に含まれておらず、`scripts/deploy.mjs` が「publish worktree 全削除 → `dist/*` + `CNAME` のみコピー」を行うため、次回 `npm run deploy` 実行時に **publish ブランチ上の検証ファイルが削除されてしまう**（Google 検証の破損 + main→publish の一貫性喪失）という問題が起きた
+- **修正内容**:
+  1. 検証ファイルをリポジトリ直下から `public/` へ移動（`git mv google6053776ad251d250.html public/google6053776ad251d250.html`）
+  2. Vite は `public/` 配下のファイルを `dist/` ルートへ自動コピーするため、以降の `npm run deploy` は検証ファイルを publish 出力に常に同梱する（`scripts/deploy.mjs` の処理ロジックは変更なし、構成説明コメントのみ更新）
+  3. 本 README の「publish ブランチのファイル一覧」を更新（`CNAME` と `public/` 配下ファイルの記載を追加）
+- **修正後の検証（実施済み）**:
+  1. `npm run deploy` を実行 → ビルド成功（vite 5.4.21）、`dist/` に `public/` 由来の `google6053776ad251d250.html` が同梱されることを確認
+  2. `origin/publish` に `google6053776ad251d250.html` が存在することを確認（`df00071`、`git ls-tree -r origin/publish` で確認）
+  3. `npm run deploy` の worktree 投入後に「公開ファイルに変更はありません。commit/push はスキップしました。」と表示され、publish ブランチがビルド出力と完全一致することを確認（以降のデプロイでも検証ファイルが消えない）
+  4. https://www.cresome.tech/google6053776ad251d250.html が 200 を返し、内容が `google-site-verification: google6053776ad251d250.html` であることを確認
+
+### 2026-08-27: README 整理（「追加機能予定: 背景の波線エフェクト」セクションを実装状況に整合）
+
+- **背景**: README の「追加機能予定: 背景の波線エフェクト」セクションが当初の計画（「薄い灰色の線 3 本・線引き描画」）のまま実装済みの 3D 点波形エフェクト（`bf9459b` / `e7f9f33`）と乖離していた。また波エフェクトの実装作業自体に作業記録のエントリがなかった
+- **変更内容** (`d6c7b37`):
+  1. 該当セクションを「背景エフェクト」に変更し、実装内容（`WaveBackground.jsx`・透視投影の点グリッド・サイン波 4 種合成・2 層描画のグロー・距離フェード等）と整合
+  2. 「サイト構成」に背景エフェクトの項目を追加
+  3. 波エフェクトの実装・刷新の作業記録エントリを追加
+- **検証（実施済み）**: README 全体を読み返し整合性を確認。README のみの変更（ソース変更なし）のため再ビルド・再デプロイは不要
+
+### 2026-08-27: `.gitignore` に `.clinerules/01-always.md` を追加
+
+- **変更** (`311eb5d`): `.clinerules/01-always.md`（AI ツール用の編集ルールファイル）を Git の管理対象外とし `.gitignore` に追加
+- **検証（実施済み）**: `git check-ignore -v` で `.gitignore` の該当ルールにヒットすること、および `git status` で未追跡ファイルから消えたことを確認
