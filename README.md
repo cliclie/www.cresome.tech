@@ -60,6 +60,7 @@ publish ブランチには以下のファイルのみ存在します:
 - トップ / 事業内容 / 開発フロー / 会社概要
 - 右サイドバー（モバイルは右スライドメニュー）
 - ページ切り替えはフェード、要素はスクロールフェードイン
+- 全ページ共通の背景エフェクト（3D 点波形。詳細は「背景エフェクト」セクション）
 
 ## 配色
 
@@ -68,27 +69,19 @@ publish ブランチには以下のファイルのみ存在します:
 - アクセント: `#EF5B00`
 - 詳細は [design.md](./design.md) を参照
 
-## 追加機能予定: 背景の波線エフェクト
+## 背景エフェクト
 
-ページの背景に、ゆるやかに動く波線のエフェクトを追加する計画です。
-2026-08-24 に実装可能性を確認し、**既存の Vite + React 環境で新規依存ライブラリなしに実装可能**と判断しました。
+全ページ共通の背景に、ゆるやかに動く **3D 点波形エフェクト** を表示しています（装飾用・コンテンツより奥の固定レイヤー）。
 
-- **デザイン（要件）**:
-  - 塗りつぶしはせず、**薄い灰色の線のみ**（線引き描画）で波線を表す
-  - 波線は **3 本程度**（本数は調整可）
-  - 3 本で位置・振幅・波長・速度をずらし、重なりが自然に見えるようにする
-- **技術構成（予定）**:
-  - Canvas 2D API + 原生 JS（`requestAnimationFrame` ループ）でサイン波を描画
-  - 新コンポーネント `src/components/WaveBackground.jsx` を作成し `App.jsx` でマウント
-  - 全体を覆う canvas を `position: fixed; inset: 0; z-index: 0; pointer-events: none` で配置
-    （z 軸では既存レイヤー `.main`(z-1) / サイドバー・トップバー(z-40) / ドロワー(z-50) のすべてより奥に配置されるため、既存 UI への変更は不要。カード等は白背景のため本文の可読性は維持）
-  - 各波線は `strokeStyle`（薄い灰色）+ `lineWidth` のみの線引き描画（`fill` 不使用）で、位相・振幅・波長・速度・透明度を個別設定
-- **品質・性能（予定）**:
-  - `devicePixelRatio` による解像度補正（線のはれ防止）とリサイズ時のキャンバス再構築
-  - `prefers-reduced-motion` 指定時はアニメーションを止め、静的な波線のみ表示
-  - タブ非表示時は描画を停止（`requestAnimationFrame` の自動停止 + クリーンアップで `cancelAnimationFrame`）
-  - 1 フレーム 3 本の線引き描画のため描画負荷は軽微
-- **デプロイ**: 既存の `npm run deploy`（build → `publish` ブランチ worktree へ配置 → push）で対応し、GitHub Pages 設定の変更は不要
+- **コンポーネント**: `src/components/WaveBackground.jsx`（`App.jsx` でマウント）
+- **描画方式**: Canvas 2D で XZ 平面の点グリッドをサイン波 4 種の合成で変形し、透視投影で 3D の点状波形として描画。背景は透明、点は薄い灰色で、波の山ほど濃く大きく・谷は淡く表示する。
+- **配置**: フルビューポートの固定 canvas（`.wave-bg` = `position: fixed; inset: 0; z-index: 0; pointer-events: none`、`src/index.css` 参照）。`.main`(z-1) / サイドバー・トップバー(z-40) / ドロワー(z-50) より奥にあるため既存 UI への変更は不要。サイドバー背景は透明のためその内側にも見える。カード等は白背景のため本文の可読性は維持。
+- **品質・性能**:
+  - `devicePixelRatio`（最大 2）による解像度補正と、リサイズ時の canvas 再構築
+  - 距離によるフェード（地平線付近・手前端でフェードアウトし描画負荷も軽減）
+  - `prefers-reduced-motion` 指定時はアニメーションを止め、静止波形のみ表示
+  - タブ非表示時は描画停止（`visibilitychange` で復帰時に再開）
+  - 新規依存ライブラリなし（Canvas 2D + 原生 JS の `requestAnimationFrame` ループ）
 
 ## 作業記録
 
@@ -104,6 +97,12 @@ publish ブランチには以下のファイルのみ存在します:
   2. `origin/publish` に `google6053776ad251d250.html` が存在することを確認（`df00071`、`git ls-tree -r origin/publish` で確認）
   3. `npm run deploy` の worktree 投入後に「公開ファイルに変更はありません。commit/push はスキップしました。」と表示され、publish ブランチがビルド出力と完全一致することを確認（以降のデプロイでも検証ファイルが消えない）
   4. https://www.cresome.tech/google6053776ad251d250.html が 200 を返し、内容が `google-site-verification: google6053776ad251d250.html` であることを確認
+
+### 2026-08-27: 背景エフェクトを実装し 3D 点波形へ刷新（WaveBackground）
+
+- **実装** (`bf9459b`): `src/components/WaveBackground.jsx` を新規作成し `App.jsx` でマウント。Canvas 2D + 原生 JS（`requestAnimationFrame` ループ）で背景エフェクトを描画（新規依存ライブラリなし）。
+- **刷新** (`e7f9f33`): 当初案の「3 本の薄い波線（線引き描画）」から、透視投影した 3D の点グリッド波形へ置き換え（サイン波 4 種合成・点は薄い灰色で山ほど濃く大きく／谷は淡く・距離によるフェード・グロー表現は `shadowBlur` ではなく 2 層描画で代用）。
+- **配置**: `.wave-bg`（`position: fixed; inset: 0; z-index: 0; pointer-events: none`）でコンテンツより奥に表示。既存 UI への変更は不要。
 
 ### 2026-08-24: `npm run dev` クラッシュの修正（vite.config.js に `process.chdir(root)` を追加）
 
