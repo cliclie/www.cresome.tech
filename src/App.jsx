@@ -3,6 +3,7 @@ import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
 import Drawer from './components/Drawer';
 import WaveBackground from './components/WaveBackground';
+import SpaceWarsBackground from './components/SpaceWarsBackground';
 import Home from './pages/Home';
 import Business from './pages/Business';
 import Flow from './pages/Flow';
@@ -20,7 +21,18 @@ export default function App() {
   const [leaving, setLeaving] = useState(false);
   const [entering, setEntering] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [bgMode, setBgMode] = useState(
+    () =>
+      window.localStorage.getItem('cresome.bgMode') === 'spacewars'
+        ? 'spacewars'
+        : 'wave'
+  );
   const transitioningRef = useRef(false);
+
+  // 背景モードの永続化
+  useEffect(() => {
+    window.localStorage.setItem('cresome.bgMode', bgMode);
+  }, [bgMode]);
 
   // reveal（フェードイン）: 表示された要素を IntersectionObserver で検出
   useEffect(() => {
@@ -67,14 +79,25 @@ export default function App() {
 
   return (
     <>
-      <WaveBackground />
-      <Sidebar items={navItems} onSelect={showPage} />
+      {bgMode === 'wave' ? (
+        <WaveBackground />
+      ) : (
+        <SpaceWarsBackground />
+      )}
+      <Sidebar
+        items={navItems}
+        onSelect={showPage}
+        bgMode={bgMode}
+        onBgModeChange={setBgMode}
+      />
       <Topbar onMenu={() => setDrawerOpen(true)} />
       <Drawer
         items={navItems}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onSelect={showPage}
+        bgMode={bgMode}
+        onBgModeChange={setBgMode}
       />
 
       <main className="main">

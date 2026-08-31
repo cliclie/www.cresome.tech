@@ -1,6 +1,7 @@
 import logo from '../../images/cresome_logo.svg';
+import BgSwitcher from './BgSwitcher';
 
-export default function Sidebar({ items, onSelect }) {
+export default function Sidebar({ items, onSelect, bgMode, onBgModeChange }) {
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -20,6 +21,8 @@ export default function Sidebar({ items, onSelect }) {
           </div>
         ))}
       </nav>
+
+      <BgSwitcher value={bgMode} onChange={onBgModeChange} />
 
       <div className="sidebar-foot">
         © cresome.tech<br />

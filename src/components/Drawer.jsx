@@ -1,4 +1,13 @@
-export default function Drawer({ items, open, onClose, onSelect }) {
+import BgSwitcher from './BgSwitcher';
+
+export default function Drawer({
+  items,
+  open,
+  onClose,
+  onSelect,
+  bgMode,
+  onBgModeChange,
+}) {
   return (
     <>
       <div className={'scrim' + (open ? ' open' : '')} onClick={onClose}></div>
@@ -23,6 +32,7 @@ export default function Drawer({ items, open, onClose, onSelect }) {
             </div>
           ))}
         </nav>
+        <BgSwitcher value={bgMode} onChange={onBgModeChange} />
         <div className="drawer-foot">© cresome.tech</div>
       </aside>
     </>
