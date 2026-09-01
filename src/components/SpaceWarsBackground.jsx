@@ -20,8 +20,8 @@ import { useEffect, useRef } from 'react';
  *   - 誘導ミサイルを片舷 2 発・計 4 発装備。内側→外側・左→右の順で 3 秒かけて装填し、
  *     揃ったら 1 秒間隔で順次発射。自機の到達予測位置（距離 ÷ ミサイル最大速度で進んだ位置）
  *     が機首方向 ±30° の内側にあるときのみ発射
- *   - ミサイルは 2 段構成: 発射後 2 秒は一段目ブースト（安全信管作動・当たり判定なし・
- *     直線飛行・最大速度 210px/s に加速）。以降は二段目誘導: 目標が前方（±90°）に
+ *   - ミサイルは 2 段構成: 発射後 0.7 秒は一段目ブースト（直線飛行・最大速度 210px/s に加速）。
+ *     発射後 2 秒は安全信管作動（当たり判定なし）。以降は二段目誘導: 目標が前方（±90°）に
  *     いるときのみ「距離と進行方向」から計算した交戦点（最短で接触する地点）へ旋回速度
  *     制限で機首を向ける、いないときは直線飛行。燃料切れ（発射 5 秒後）で前方噴射・
  *     誘導を停止して直線飛行。加速中は後方中央の単一ジェット、旋回中は先頭/後部の
@@ -35,7 +35,7 @@ import { useEffect, useRef } from 'react';
  *   敵機レーザーは射程 ENEMY_LASER_RANGE に達した瞬間に消滅）
  * - 隕石（自機・敵機よりやや小さい不規則多角形。速度・方向ランダムで画面外から
  *   流れ込み、重力の影響を受けながら漂う。自機・敵機に当たると船と隕石がともに爆発。
- *   同時 1〜8 個、画面外へ出たりブラックホール核心に触れたりすると消滅）
+ *   同時 1〜12 個、画面外へ出たりブラックホール核心に触れたりすると消滅）
  * - 当たり判定: 発射したビームが敵機・自機どちらかに当たると被弾船が爆発
  *   （ブラックホールに当たると弾は消滅）、
  *   船がブラックホールに触れる・自機と敵機が衝突すると爆発
@@ -94,9 +94,9 @@ const BULLET_SHIP_HIT_R = 15; // 弾 vs 船の接触判定半径
 const REAPPEAR_SPEED = 100; // 出現直後の進行方向の初速度（px/s）
 
 // 敵機の慣性挙動（低頻度で方向転換・前後噴射を決める）
-const ENEMY_ACCEL = 21; // 敵機・前方スラスターの加速度（px/s^2）
+const ENEMY_ACCEL = 42; // 敵機・前方スラスターの加速度（px/s^2）
 const ENEMY_BRAKE = 17; // 敵機・後方スラスターの減速度（px/s^2）
-const ENEMY_MAX_SPEED = 34; // 敵機速度上限（px/s）
+const ENEMY_MAX_SPEED = 41; // 敵機速度上限（px/s）
 const ENEMY_TURN = 0.45; // 敵機の回転速度（rad/s）
 
 // 誘導ミサイル（敵機。片舷 2 発×2 舷 = 4 発。内側→外側・左→右の順で 3 秒かけて装填）
@@ -107,7 +107,8 @@ const MISSILE_RELOAD_WAIT = 10; // 最後のミサイル消滅後から装填再
 const MISSILE_TURN = 0.85; // 誘導の旋回速度上限（rad/s・誘導性は悪め）
 const MISSILE_ACCEL = 140; // ミサイルの前方噴射加速度（px/s^2）
 const MISSILE_MAX_SPEED = 210; // ミサイル速度上限（px/s）
-const MISSILE_BOOST = 2; // 一段目ブースト時間 = 安全信管（この間当たり判定なし・直線飛行・最大速度へ加速）
+const MISSILE_BOOST = 0.7; // 一段目ブースト時間（この間直線飛行・最大速度へ加速）
+const MISSILE_SAFE = 2; // 安全信管時間（この間当たり判定なし）
 const MISSILE_FUEL_TIME = 5; // 燃料総時間（これを超えると前方噴射・誘導を停止して直線飛行）
 const MISSILE_LIFE = 10; // 発射後この秒数が経つと自爆
 const MISSILE_HIT_R = 16; // ミサイル vs 自機の接触判定半径
@@ -117,7 +118,7 @@ const MISSILE_TRAIL_LIFE = 0.6; // 煙の軌跡の持続時間（秒）
 const MISSILE_TRAIL_DT = 0.02; // 軌跡ポイントのサンプリング間隔（秒）
 
 // 隕石（ランダム漂遊する背景要素。速度・方向ランダム・画面外から出現・重力の影響あり・当たり判定あり）
-const METEOR_MAX = 8; // 同時存在する隕石数の上限（1〜8 個でランダム漂遊）
+const METEOR_MAX = 12; // 同時存在する隕石数の上限（1〜12 個でランダム漂遊）
 const METEOR_SIZE_MIN = 8; // 半径最小（px）。自機・敵機よりやや小さめ
 const METEOR_SIZE_MAX = 11; // 半径最大（px）
 const METEOR_SPEED_MIN = 40; // 速度最小（px/s）
@@ -363,7 +364,7 @@ export default function SpaceWarsBackground() {
     };
 
     // 爆発演出（各線分が中心から回転しながら放射状に散る。対象は船・ミサイルの両方）
-    const explode = (ship, segs, vx, vy) => {
+    const explode = (ship, segs, vx, vy, noRing = false) => {
       const c = Math.cos(ship.angle);
       const s = Math.sin(ship.angle);
       const es = segs.map(([p, q]) => {
@@ -384,7 +385,7 @@ export default function SpaceWarsBackground() {
           w: (Math.random() < 0.5 ? -1 : 1) * (1.5 + Math.random() * 3),
         };
       });
-      explosions.push({ x: ship.x, y: ship.y, vx, vy, t0: time, segs: es });
+      explosions.push({ x: ship.x, y: ship.y, vx, vy, t0: time, segs: es, noRing });
     };
 
     // 船を撃破する（死亡フラグを立て爆発演出を発火）
@@ -649,7 +650,7 @@ export default function SpaceWarsBackground() {
           bullets.splice(i, 1);
         }
       }
-      // ミサイル: 2 段構成（一段目 ブースト 2 秒 = 安全信管。直線・最大速度到達 → 二段目 誘導）
+      // ミサイル: 2 段構成（一段目 ブースト 0.7 秒、直線・最大速度到達 → 二段目 誘導。安全信管 2 秒は当たり判定なし）
       // 誘導は慣性: 「距離と進行方向」から計算した交戦点（最短で接触する地点）へ機首を回す
       // 目標が前方（±90°）にないとき・燃料切れ・自機破壊中・自機描画範囲外は直線飛行
       for (const m of missiles) {
@@ -659,7 +660,7 @@ export default function SpaceWarsBackground() {
           player.dead ||
           player.x < 0 || player.x > width ||
           player.y < 0 || player.y > height;
-        const canGuide = age >= MISSILE_BOOST && !outOfFuel && !targetGone; // 安全信管解除後のみ誘導
+        const canGuide = age >= MISSILE_BOOST && !outOfFuel && !targetGone; // 一段目ブースト終了後のみ誘導
         if (canGuide) {
           // 誘導は目標（現在位置）が機首の前方 ±90° 内にあるときのみ行う
           const toTarget = Math.atan2(player.y - m.y, player.x - m.x);
@@ -703,7 +704,7 @@ export default function SpaceWarsBackground() {
         m.x += m.velX * dt;
         m.y += m.velY * dt;
         // 煙の軌跡: 後方の位置を一定間隔で記録し、持続時間が過ぎた古い点を破棄
-        if (time - m.trailAt >= MISSILE_TRAIL_DT) {
+        if (!outOfFuel && time - m.trailAt >= MISSILE_TRAIL_DT) {
           m.trail.push({ x: m.x, y: m.y, t: time });
           m.trailAt = time;
         }
@@ -713,7 +714,7 @@ export default function SpaceWarsBackground() {
       // 10 秒経過で自爆（爆発）・描画範囲外は無音で消滅（爆発なし）
       for (let i = missiles.length - 1; i >= 0; i--) {
         const m = missiles[i];
-        const safe = time - m.born < MISSILE_BOOST; // 安全信管（= 一段目ブースト時間）: 当たり判定なし
+        const safe = time - m.born < MISSILE_SAFE; // 安全信管: 当たり判定なし
         const hitPlayer = !safe && !player.dead && Math.hypot(m.x - player.x, m.y - player.y) < MISSILE_HIT_R;
         // 信管解除後は、敵機にたまたま当たっても当たり判定とする（敵機が被弾・爆発）
         const hitEnemy = !safe && !enemy.dead && Math.hypot(m.x - enemy.x, m.y - enemy.y) < MISSILE_HIT_R;
@@ -723,11 +724,11 @@ export default function SpaceWarsBackground() {
         if (!hitPlayer && !hitEnemy && !absorbed && !selfBoom && !offScreen) continue;
         if (hitPlayer) kill(player, PLAYER_SEGS, player.velX, player.velY);
         if (hitEnemy) kill(enemy, ENEMY_SEGS, enemy.velX, enemy.velY);
-        if (hitPlayer || hitEnemy || selfBoom) explode(m, MISSILE_SEGS, m.velX * 0.4, m.velY * 0.4);
+        if (hitPlayer || hitEnemy || selfBoom) explode(m, MISSILE_SEGS, m.velX * 0.4, m.velY * 0.4, true);
         missiles.splice(i, 1);
         enemy.arms.lastEnd = time;
       }
-      // 隕石: ランダム生成（同時 1〜8 個・上限 8 ・無い場合は約 1.5 秒以内に再出現）
+      // 隕石: ランダム生成（同時 1〜12 個・上限 12 ・無い場合は約 1.5 秒以内に再出現）
       if (time >= nextMeteor) {
         if (meteors.length < METEOR_MAX) {
           spawnMeteor();
@@ -762,9 +763,30 @@ export default function SpaceWarsBackground() {
         const gone =
           mt.x < -METEOR_OFFSCREEN || mt.x > width + METEOR_OFFSCREEN ||
           mt.y < -METEOR_OFFSCREEN || mt.y > height + METEOR_OFFSCREEN;
-        if (boom) explode(mt, mt.segs, mt.velX * 0.4, mt.velY * 0.4);
+        if (boom) explode(mt, mt.segs, mt.velX * 0.4, mt.velY * 0.4, true);
         if (boom || gone) meteors.splice(i, 1);
       }
+      // 隕石同士の当たり判定: 接触するとともに爆発
+      {
+        const hit = new Set();
+        for (let i = 0; i < meteors.length; i++) {
+          for (let j = i + 1; j < meteors.length; j++) {
+            const a = meteors[i];
+            const b = meteors[j];
+            if (Math.hypot(a.x - b.x, a.y - b.y) < a.r + b.r) {
+              hit.add(i);
+              hit.add(j);
+            }
+          }
+        }
+        if (hit.size > 0) {
+          for (const idx of hit) {
+            explode(meteors[idx], meteors[idx].segs, meteors[idx].velX * 0.4, meteors[idx].velY * 0.4, true);
+          }
+          meteors = meteors.filter((_, idx) => !hit.has(idx));
+        }
+      }
+
       // 当たり判定: ビーム vs 船 / ビーム vs ブラックホール / 船 vs ブラックホール / 自機 vs 敵機
       for (let i = bullets.length - 1; i >= 0; i--) {
         const m = bullets[i];
@@ -914,7 +936,7 @@ export default function SpaceWarsBackground() {
         const alpha = 0.5 * fade;
         const cx = e.x + e.vx * age;
         const cy = e.y + e.vy * age;
-        if (age < 0.4) {
+        if (!e.noRing && age < 0.4) {
           ctx.strokeStyle = `rgba(${LINE}, ${0.35 * (1 - age / 0.4)})`;
           ctx.beginPath();
           ctx.arc(cx, cy, 5 + age * 220, 0, TAU);
