@@ -7,27 +7,42 @@ import { useEffect, useRef } from 'react';
  * - ゆるかに漂う星点（プラネタリウム的星野）
  * - 自機（三角形・両翼。W: 前進（後方中央のメインスラスターからジェット噴射）
  *   / S: 後退減速（前方両舷スラスターから小さな霧）/ A・D: 回転（前後の舷側から
- *   RCS 小噴射）/ スペース: 弾発射（クールタイムなし。同時弾数 8 発まで）
+ *   RCS 小噴射）/ スペース: レーザー連射（0.1 秒間隔・同時最大 8 発、完射後は 2 秒の
+ *   クールタイム。キーを離すと残りの連射はキャンセル）
  * - 敵機（クルーザー：前面は V 字開口の円、後方はテールフィン 2 本。AI 漂遊）
  *   - 慣性移動し、低頻度で旋回・前後スラスター噴射（加減速）。前方噴射は後方中央の
- *     単一ジェット（自機と同一）。旋回中は前後の舷側から RCS 小噴射
+ *     単一ジェット（自機と同一）。進行方向の速度が上限に達するまでは加速し、到達後は
+ *     加速も噴射表示も停止。旋回中は前後の舷側から RCS 小噴射
  *   - レーザー: 機首 0°（正面真直前）の方向にしか撃てない 4 連射（0.3 秒間隔）。
  *     照準はあいまいなリード予測（1 回リード + ランダム誤差）で、その予測位置が
- *     機首方向の狭い扇（±約 14°）かつ射程内（弾の到達距離）のときのみ発射。
- *     連射後 2 秒のクールタイム。
+ *     機首方向の狭い扇（±約 14°）に入るたび発射。連射後 2 秒のクールタイム。
+ *     弾は射程 ENEMY_LASER_RANGE（400px）到達で消滅する。
  *   - 誘導ミサイルを片舷 2 発・計 4 発装備。内側→外側・左→右の順で 3 秒かけて装填し、
- *     揃ったら 1 秒間隔で順次発射。ミサイルも慣性で飛行（左右旋回と前方噴射のみ、
- *     誘導性は悪め）、自機の着弾予測位置へ誘導。航行距離 3300px、画面外、または自機
- *     破壊時には自爆。安全信管解除後は敵機への偶発接触も当たり判定。消滅から 10 秒後に再装填
- * - ブラックホール（アスタリスク型の線画。薄い広い重力圏の円を持ち、
- *   圏内にいる船は距離の二乗に反比例した重力で引き寄せられる）
- * - 弾丸（短い直線）
+ *     揃ったら 1 秒間隔で順次発射。自機の到達予測位置（距離 ÷ ミサイル最大速度で進んだ位置）
+ *     が機首方向 ±30° の内側にあるときのみ発射
+ *   - ミサイルは 2 段構成: 発射後 2 秒は一段目ブースト（安全信管作動・当たり判定なし・
+ *     直線飛行・最大速度 210px/s に加速）。以降は二段目誘導: 目標が前方（±90°）に
+ *     いるときのみ「距離と進行方向」から計算した交戦点（最短で接触する地点）へ旋回速度
+ *     制限で機首を向ける、いないときは直線飛行。燃料切れ（発射 5 秒後）で前方噴射・
+ *     誘導を停止して直線飛行。加速中は後方中央の単一ジェット、旋回中は先頭/後部の
+ *     左右両端にある誘導スラスター 4 箇所から後方外向き 45° へ噴射（自機/敵機と同じ差動）。
+ *     航行中は後部に煙の軌跡が残ってじわっと消える。発射 10 秒後に自爆し、
+ *     描画範囲外に出たら無音で消滅。安全信管解除後は敵機への偶発接触も当たり判定。
+ *     消滅から 10 秒後に再装填
+ * - ブラックホール（アスタリスク型の線画。
+ *   重力圏内にいる船は距離の二乗に反比例した重力で引き寄せられる。圏の境界線は描画しない）
+ * - 弾丸（短い直線。自機レーザーは射程制限なく画面外に出た瞬間に消滅。
+ *   敵機レーザーは射程 ENEMY_LASER_RANGE に達した瞬間に消滅）
+ * - 隕石（自機・敵機よりやや小さい不規則多角形。速度・方向ランダムで画面外から
+ *   流れ込み、重力の影響を受けながら漂う。自機・敵機に当たると船と隕石がともに爆発。
+ *   同時 1〜8 個、画面外へ出たりブラックホール核心に触れたりすると消滅）
  * - 当たり判定: 発射したビームが敵機・自機どちらかに当たると被弾船が爆発
  *   （ブラックホールに当たると弾は消滅）、
  *   船がブラックホールに触れる・自機と敵機が衝突すると爆発
  * - 爆発: 船を構成する各直線が船の中心から回転しながら放射状に飛び散り、
  *   しばらくしてフェードアウト。その後ランダムな位置にワープ演出で出現し、
- *   進行方向に速度を与える（初期表示時もワープ演出で出現）
+ *   その場ではランダムな向きで向き直ったうえで、その向きに初速度を与えて直進する
+ *   （初期表示時もワープ演出で出現）
  * コンテンツより奥側（z-index: 0）のフルビューポート固定 canvas
  * として配置する。
  *
@@ -54,18 +69,21 @@ const WRAP = 40; // 画面端でのラップマージン
 const ACCEL = 98; // 加速度（px/s^2）
 const MAX_SPEED = 235; // 速度上限（ソフトキャップ。摩擦ではない）
 const ROT_SPEED = 2.4; // 回転速度（rad/s）
-const MAX_BULLETS = 8; // 同時存在する弾の数上限（自機＋敵機合計）
 const BULLET_SPEED = 520; // 弾の速度（px/s）
-const BULLET_LIFE = 1.2; // 弾の寿命（秒）
 
-// 敵機レーザー（連射: 機首 0° 直前のみ・あいまいなリード予測・射程内のみ）
+// 自機レーザー（連射: 0.1 秒間隔・最大 8 発。完射後は 2 秒クールタイム）
+const PLAYER_LASER_BURST = 8; // 連射する発数
+const PLAYER_LASER_GAP = 0.1; // 連射の間隔（秒）
+const PLAYER_LASER_RELOAD = 2; // 8 発目が終わった後、次の連射までのクールタイム（秒）
+
+// 敵機レーザー（連射: 機首 0° 直前のみ・あいまいなリード予測）
 const LASER_BURST = 4; // 連射する発数
 const LASER_GAP = 0.3; // 連射の間隔（秒）
 const LASER_RELOAD = 2; // 4 発目が終わった後、次の連射までのクールタイム（秒）
-const LASER_RANGE = BULLET_SPEED * BULLET_LIFE; // 有効射程（弾が飛べる距離）
 const LASER_FIRE_CONE = 0.25; // 発射できる正面扇（機首 0° 中心 ±約 14°）
 const LASER_LEAD = 0.6; // リード予測率（1 未満で予測を甘くする）
 const LASER_AIM_ERR = 40; // 照準のランダム誤差（px。射線予測をあいまいにする）
+const ENEMY_LASER_RANGE = 400; // 敵機レーザーの射程（px）。この距離を飛行したら消滅（自機レーザーは射程制限なし）
 
 // 当たり判定・爆発・ワープ
 const EXP_DUR = 0.9; // 爆発（線分が散開・フェード）の持続時間（秒）
@@ -89,10 +107,25 @@ const MISSILE_RELOAD_WAIT = 10; // 最後のミサイル消滅後から装填再
 const MISSILE_TURN = 0.85; // 誘導の旋回速度上限（rad/s・誘導性は悪め）
 const MISSILE_ACCEL = 140; // ミサイルの前方噴射加速度（px/s^2）
 const MISSILE_MAX_SPEED = 210; // ミサイル速度上限（px/s）
-const MISSILE_RANGE = 3300; // 自爆する航行距離（px）
+const MISSILE_BOOST = 2; // 一段目ブースト時間 = 安全信管（この間当たり判定なし・直線飛行・最大速度へ加速）
+const MISSILE_FUEL_TIME = 5; // 燃料総時間（これを超えると前方噴射・誘導を停止して直線飛行）
+const MISSILE_LIFE = 10; // 発射後この秒数が経つと自爆
 const MISSILE_HIT_R = 16; // ミサイル vs 自機の接触判定半径
-const MISSILE_FUSE = 2; // 安全信管：発射後この秒数間は当たり判定なし（秒）
-const MISSILE_FIRE_CONE = Math.PI / 4; // 発射条件: 予測射線と機首方向の許容角度（±45°・おおまかな判定）
+const MISSILE_FIRE_CONE = Math.PI / 6; // 発射条件: 自機の到達予測位置と機首方向の許容角度（±30°）
+const MISSILE_GAS_ANGLE = Math.PI / 4; // 誘導スラスター 4 箇所の噴出角度（後方外向き・初期 45°・調整用）
+const MISSILE_TRAIL_LIFE = 0.6; // 煙の軌跡の持続時間（秒）
+const MISSILE_TRAIL_DT = 0.02; // 軌跡ポイントのサンプリング間隔（秒）
+
+// 隕石（ランダム漂遊する背景要素。速度・方向ランダム・画面外から出現・重力の影響あり・当たり判定あり）
+const METEOR_MAX = 8; // 同時存在する隕石数の上限（1〜8 個でランダム漂遊）
+const METEOR_SIZE_MIN = 8; // 半径最小（px）。自機・敵機よりやや小さめ
+const METEOR_SIZE_MAX = 11; // 半径最大（px）
+const METEOR_SPEED_MIN = 40; // 速度最小（px/s）
+const METEOR_SPEED_MAX = 110; // 速度最大（px/s）
+const METEOR_SPAWN_MIN = 3; // ランダム生成の間隔の下限（秒）
+const METEOR_SPAWN_MAX = 8; // ランダム生成の間隔の上限（秒）
+const METEOR_SHIP_HIT_R = 12; // 隕石 vs 自機・敵機の接触判定の追加半径
+const METEOR_OFFSCREEN = 80; // 画面外からの削除マージン（px）
 
 // 自機を構成する線分（機体中心原点・機首 +x 方向のローカル座標）
 const PLAYER_SEGS = [
@@ -163,12 +196,16 @@ export default function SpaceWarsBackground() {
     let width = 0;
     let height = 0;
     let nextEnemyFire = 3; // 敵機の次に発射する時刻
-    let laserShot = 0; // 現在の連射で撃った発数（0-3）
+    let laserShot = 0; // 敵機の現在の連射で撃った発数（0-3）
+    let nextPlayerFire = 0; // 自機レーザーの次に発射する時刻
+    let playerLaserShot = 0; // 自機の現在の連射で撃った発数（0-7）
     let stars = [];
     let player = null;
     let enemy = null;
     let bullets = [];
     let missiles = [];
+    let meteors = [];
+    let nextMeteor = 0; // 次の隕石生成時刻
     let explosions = [];
     const keys = { w: false, a: false, s: false, d: false, space: false };
 
@@ -213,6 +250,7 @@ export default function SpaceWarsBackground() {
         warp: { t0: time + 0.15 },
         pendingBoost: true,
       };
+      nextMeteor = time + rnd(1, 3); // 最初の隕石はロード後 1〜3 秒で出現
     };
 
     // 画面端でのラップアラウンド
@@ -243,6 +281,72 @@ export default function SpaceWarsBackground() {
         puff(8, frontSide * (4.5 + d) + (Math.random() - 0.5), r, a);
         puff(-8, rearSide * (5 + d) + (Math.random() - 0.5), r, a);
       }
+    };
+
+    // ミサイルの加速噴射: 後方中央の単一ジェット（自機/敵機と同様・小型版）。
+    // 後端（x = -3.5）から後方へ 3 段の puff。後方に行くほど大きくなり薄くなる
+    const missileThrustPuffs = (phase) => {
+      const flick = 0.4 + 0.6 * Math.abs(Math.sin(time * 26 + phase));
+      for (let i = 0; i < 3; i++) {
+        const d = 2.5 + i * 2.5;
+        const r = (1.5 + i * 1.0) * (0.75 + 0.5 * Math.random());
+        const a = (0.26 - i * 0.06) * flick;
+        puff(-3.5 - d, (Math.random() - 0.5) * 1.2, r, a);
+      }
+    };
+
+    // ミサイルの誘導スラスター噴射（ノズル 4 箇所）:
+    // 先頭の左右両端（x = +2.5）＋後部の左右両端（x = -2.5）。
+    // 各ノズルは機体軸に対して後方外向き（MISSILE_GAS_ANGLE = 45°）へ puff が流れ、
+    // 差動は自機/敵機 RCS と同じ（右旋回: 先頭左＋後部右、左旋回: 先頭右＋後部左）
+    const missileGuidePuffs = (turnDir, phase) => {
+      const frontSide = turnDir > 0 ? -1 : 1;
+      const rearSide = turnDir > 0 ? 1 : -1;
+      const flick = 0.4 + 0.6 * Math.abs(Math.sin(time * 24 + phase));
+      const cd = Math.cos(MISSILE_GAS_ANGLE); // 後方方向への成分
+      const sd = Math.sin(MISSILE_GAS_ANGLE); // 外向き方向への成分
+      for (let i = 0; i < 2; i++) {
+        const d = 2 + i * 2.5;
+        const r = (1.4 + i * 0.9) * (0.75 + 0.5 * Math.random());
+        const a = (0.24 - i * 0.08) * flick;
+        puff(2.5 - cd * d, frontSide * (1.2 + sd * d) + (Math.random() - 0.5) * 0.8, r, a);
+        puff(-2.5 - cd * d, rearSide * (1.2 + sd * d) + (Math.random() - 0.5) * 0.8, r, a);
+      }
+    };
+
+    // 隕石を 1 個生成（画面外から出現・進行方向も速度もランダム・不規則多角形の岩）
+    const spawnMeteor = () => {
+      const r = rnd(METEOR_SIZE_MIN, METEOR_SIZE_MAX);
+      const m = 40; // 画面外からの出現マージン
+      const side = Math.floor(Math.random() * 4); // 0 上 / 1 右 / 2 下 / 3 左
+      let x;
+      let y;
+      let base;
+      if (side === 0) { x = rnd(0, width); y = -m; base = Math.PI / 2; }
+      else if (side === 1) { x = width + m; y = rnd(0, height); base = Math.PI; }
+      else if (side === 2) { x = rnd(0, width); y = height + m; base = -Math.PI / 2; }
+      else { x = -m; y = rnd(0, height); base = 0; }
+      const ang = base + rnd(-1.2, 1.2); // 画面内側を向いた方向に ±約 69° のばらつき
+      const sp = rnd(METEOR_SPEED_MIN, METEOR_SPEED_MAX);
+      // 不規則な多角形（7〜9 頂点）の岩の形状をローカル座標で生成
+      const n = 7 + Math.floor(Math.random() * 3);
+      const pts = [];
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * TAU;
+        const rr = r * rnd(0.72, 1.18);
+        pts.push([Math.cos(a) * rr, Math.sin(a) * rr]);
+      }
+      meteors.push({
+        x,
+        y,
+        velX: Math.cos(ang) * sp,
+        velY: Math.sin(ang) * sp,
+        r,
+        angle: rnd(0, TAU),
+        angleV: rnd(-0.7, 0.7), // ゆっくりしたランダムな自転
+        pts,
+        segs: pts.map((p, i2) => [p, pts[(i2 + 1) % pts.length]]), // 爆発（線分散開）用の線分
+      });
     };
 
     // 重力圏の外側・画面端からのマージン内にあるランダムな位置
@@ -291,11 +395,14 @@ export default function SpaceWarsBackground() {
       explode(ship, segs, vx, vy);
     };
 
-    // ランダム位置にワープ演出で再出現
+    // ランダム位置にワープ演出で再出現（新しいランダムな向きで向き直し、その向きへ初速度）
     const respawn = (ship) => {
       const pos = randomRespawnPos();
       ship.x = pos.x;
       ship.y = pos.y;
+      ship.angle = Math.random() * TAU; // ランダムな向きで向き直す
+      ship.velX = 0; // 死亡時の旧速度をクリアし、船体表示と運動方向を一致させる
+      ship.velY = 0;
       ship.dead = false;
       ship.warp = { t0: time };
       ship.pendingBoost = true;
@@ -383,15 +490,32 @@ export default function SpaceWarsBackground() {
         player.velX += pg.x * dt;
         player.velY += pg.y * dt;
       }
-      // 自機発射（スペース、クールタイムなし。同時弾数で上限）
-      if (!player.dead && keys.space && bullets.length < MAX_BULLETS) {
-        bullets.push({
-          x: player.x + Math.cos(player.angle) * 20,
-          y: player.y + Math.sin(player.angle) * 20,
-          a: player.angle,
-          life: 0,
-          o: 'p',
-        });
+      // 自機レーザー連射（0.1 秒間隔・同時 8 発まで。完射後は 2 秒クールタイム。
+      // キーを離すと残りの連射をキャンセルし、次は最初から連射し直す）
+      if (!player.dead) {
+        const playerBullets = bullets.reduce((n, b) => n + (b.o === 'p' ? 1 : 0), 0);
+        if (keys.space && time >= nextPlayerFire && playerLaserShot < PLAYER_LASER_BURST && playerBullets < PLAYER_LASER_BURST) {
+          bullets.push({
+            x: player.x + Math.cos(player.angle) * 20,
+            y: player.y + Math.sin(player.angle) * 20,
+            a: player.angle,
+            o: 'p',
+          });
+          playerLaserShot += 1;
+          if (playerLaserShot >= PLAYER_LASER_BURST) {
+            playerLaserShot = 0;
+            nextPlayerFire = time + PLAYER_LASER_RELOAD; // 完射後はクールタイム
+          } else {
+            nextPlayerFire = time + PLAYER_LASER_GAP;
+          }
+        }
+        if (!keys.space && playerLaserShot > 0) {
+          playerLaserShot = 0;
+          nextPlayerFire = 0; // キー離下で連射・クールタイムをリセット
+        }
+      } else {
+        playerLaserShot = 0; // 被弾時は連射状態をリセット
+        nextPlayerFire = 0;
       }
       // 敵機: 慣性ベース。低頻度で旋回・前後噴射を決める（死んでいる間はスキップ）
       if (!enemy.dead) {
@@ -414,7 +538,10 @@ export default function SpaceWarsBackground() {
         }
         if (enemy.brake && time >= enemy.brakeUntil) enemy.brake = false;
         enemy.angle += enemy.turn * dt;
-        if (enemy.thrust) {
+        // 加速停止は「進行方向（機首方向）の速度が最高速度に達したとき」のみ。
+        // 横方向の慣性移動中や、機首を反転させて減速（逆進）している場合はスラスターを維持できる
+        const eFwd = enemy.velX * Math.cos(enemy.angle) + enemy.velY * Math.sin(enemy.angle);
+        if (enemy.thrust && eFwd < ENEMY_MAX_SPEED) {
           enemy.velX += Math.cos(enemy.angle) * ENEMY_ACCEL * dt;
           enemy.velY += Math.sin(enemy.angle) * ENEMY_ACCEL * dt;
         }
@@ -446,7 +573,8 @@ export default function SpaceWarsBackground() {
           arms.fireIdx = 0;
           arms.nextFire = time + 0.4;
         } else if (arms.phase === 'firing') {
-          // 予測射線内に自機が入ったときのみ発射（目標の到達予測位置を大まかにリードして判定）
+          // 発射から自機到達までの推定時間（距離 ÷ ミサイル最大速度）だけ進んだ自機の
+          // 予測位置が、機首方向 ±30° 内にあるときのみ発射
           let inAimLine = false;
           if (!player.dead) {
             const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
@@ -468,8 +596,10 @@ export default function SpaceWarsBackground() {
               angle: enemy.angle, // 発射直後の速度・方向は敵船と同じ
               velX: enemy.velX,
               velY: enemy.velY,
-              born: time, // 安全信管用の発射時刻
-              dist: 0,
+              born: time, // 発射時刻（安全信管・燃料・自爆タイマー用）
+              turnDir: 0, // 旋回方向（誘導スラスター噴射の表示用: -1 / 0 / +1）
+              trail: [], // 煙の軌跡ポイント { x, y, t }
+              trailAt: 0, // 前回の軌跡記録時刻
             });
             arms.fireIdx += 1;
             arms.nextFire = time + MISSILE_FIRE_GAP;
@@ -480,92 +610,160 @@ export default function SpaceWarsBackground() {
           arms.nextLoad = time;
         }
         // 敵機レーザー: 0.3 秒間隔の 4 連射。機首 0°（正面真直前）にしか撃てない。
-        // 照準はあいまいなリード予測（1 回リード + ランダム誤差）で、予測位置が機首の狭い扇かつ射程内のときのみ
-        if (time >= nextEnemyFire && !player.dead && bullets.length < MAX_BULLETS) {
+        // 照準はあいまいなリード予測（1 回リード + ランダム誤差）。射程は画面外までなので距離制限は不要。
+        // 機首方向の扇に入るあいまい照準のときのみ発射
+        if (time >= nextEnemyFire && !player.dead) {
           const d = Math.hypot(player.x - enemy.x, player.y - enemy.y);
-          if (d <= LASER_RANGE) {
-            // あいまいな到達予測: リード率 0.6 の 1 回リード + ランダム誤差
-            const t = d / BULLET_SPEED;
-            const px = player.x + player.velX * t * LASER_LEAD + rnd(-LASER_AIM_ERR, LASER_AIM_ERR);
-            const py = player.y + player.velY * t * LASER_LEAD + rnd(-LASER_AIM_ERR, LASER_AIM_ERR);
-            const aim = Math.atan2(py - enemy.y, px - enemy.x);
-            let relA = ((aim - enemy.angle) % TAU + TAU) % TAU;
-            if (relA > Math.PI) relA -= TAU;
-            if (Math.abs(relA) <= LASER_FIRE_CONE) {
-              bullets.push({
-                x: enemy.x + Math.cos(enemy.angle) * 14,
-                y: enemy.y + Math.sin(enemy.angle) * 14,
-                a: enemy.angle, // 機首 0°（正面真直前）のみ
-                life: 0,
-                o: 'e',
-              });
-              laserShot += 1;
-              nextEnemyFire =
-                laserShot >= LASER_BURST ? time + LASER_RELOAD : time + LASER_GAP; // 4 発目後はクールタイム
-              if (laserShot >= LASER_BURST) laserShot = 0;
-            }
+          // あいまいな到達予測: リード率 0.6 の 1 回リード + ランダム誤差
+          const t = d / BULLET_SPEED;
+          const px = player.x + player.velX * t * LASER_LEAD + rnd(-LASER_AIM_ERR, LASER_AIM_ERR);
+          const py = player.y + player.velY * t * LASER_LEAD + rnd(-LASER_AIM_ERR, LASER_AIM_ERR);
+          const aim = Math.atan2(py - enemy.y, px - enemy.x);
+          let relA = ((aim - enemy.angle) % TAU + TAU) % TAU;
+          if (relA > Math.PI) relA -= TAU;
+          if (Math.abs(relA) <= LASER_FIRE_CONE) {
+            bullets.push({
+              x: enemy.x + Math.cos(enemy.angle) * 14,
+              y: enemy.y + Math.sin(enemy.angle) * 14,
+              a: enemy.angle, // 機首 0°（正面真直前）のみ
+              o: 'e',
+              d: 0, // 移動距離（射程制限用）
+            });
+            laserShot += 1;
+            nextEnemyFire =
+              laserShot >= LASER_BURST ? time + LASER_RELOAD : time + LASER_GAP; // 4 発目後はクールタイム
+            if (laserShot >= LASER_BURST) laserShot = 0;
           }
         }
       }
-      // 弾: 直線飛行し、寿命で消滅
-      for (const m of bullets) {
-        m.life += dt;
+      // 弾: 直線飛行し、画面外に出た瞬間に消滅。敵機レーザーのみ射程 ENEMY_LASER_RANGE で消滅
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        const m = bullets[i];
         m.x += Math.cos(m.a) * BULLET_SPEED * dt;
         m.y += Math.sin(m.a) * BULLET_SPEED * dt;
-      }
-      // ミサイル: 慣性誘導（左右旋回と前方噴射のみ・誘導性は悪め）
-      // 自機の現在位置ではなく、着弾予測位置（射線予測: 自機の速度で到達時刻までの移動を予測）へ誘導
-      for (const m of missiles) {
-        let ix = player.x;
-        let iy = player.y;
-        for (let it = 0; it < 2; it++) {
-          const d = Math.hypot(ix - m.x, iy - m.y);
-          const t = d / MISSILE_MAX_SPEED; // 推定到達時間
-          ix = player.x + player.velX * t; // 自機の着弾予測位置
-          iy = player.y + player.velY * t;
+        if (m.o === 'e') m.d += BULLET_SPEED * dt; // 移動距離の蓄積（敵機レーザーのみ）
+        if (
+          m.x < -WRAP || m.x > width + WRAP || m.y < -WRAP || m.y > height + WRAP ||
+          (m.o === 'e' && m.d >= ENEMY_LASER_RANGE)
+        ) {
+          bullets.splice(i, 1);
         }
-        const tx = Math.atan2(iy - m.y, ix - m.x);
-        let da = ((tx - m.angle) % TAU + TAU) % TAU;
-        if (da > Math.PI) da -= TAU;
-        const mt = MISSILE_TURN * dt;
-        m.angle += Math.max(-mt, Math.min(mt, da));
-        m.velX += Math.cos(m.angle) * MISSILE_ACCEL * dt;
-        m.velY += Math.sin(m.angle) * MISSILE_ACCEL * dt;
-        let sp = Math.hypot(m.velX, m.velY);
+      }
+      // ミサイル: 2 段構成（一段目 ブースト 2 秒 = 安全信管。直線・最大速度到達 → 二段目 誘導）
+      // 誘導は慣性: 「距離と進行方向」から計算した交戦点（最短で接触する地点）へ機首を回す
+      // 目標が前方（±90°）にないとき・燃料切れ・自機破壊中・自機描画範囲外は直線飛行
+      for (const m of missiles) {
+        const age = time - m.born;
+        const outOfFuel = age >= MISSILE_FUEL_TIME; // 燃料切れ: 前方噴射・誘導をやめ直線飛行
+        const targetGone =
+          player.dead ||
+          player.x < 0 || player.x > width ||
+          player.y < 0 || player.y > height;
+        const canGuide = age >= MISSILE_BOOST && !outOfFuel && !targetGone; // 安全信管解除後のみ誘導
+        if (canGuide) {
+          // 誘導は目標（現在位置）が機首の前方 ±90° 内にあるときのみ行う
+          const toTarget = Math.atan2(player.y - m.y, player.x - m.x);
+          let relT = ((toTarget - m.angle) % TAU + TAU) % TAU;
+          if (relT > Math.PI) relT -= TAU;
+          if (Math.abs(relT) <= Math.PI / 2) {
+            // 交戦点: 相対位置 d = P - M、相対速度 w = Vp - Vm のとき、
+            // t* = -(d・w)/|w|^2 が両者が最近接する時刻（最短で接触する地点）
+            const dx = player.x - m.x;
+            const dy = player.y - m.y;
+            const wx = player.velX - m.velX;
+            const wy = player.velY - m.velY;
+            const w2 = wx * wx + wy * wy;
+            let t = w2 < 1e-6 ? 0 : -(dx * wx + dy * wy) / w2;
+            if (t < 0) t = 0; // 目標を「追い越す」場合は現在位置へ
+            const ix = player.x + player.velX * t;
+            const iy = player.y + player.velY * t;
+            const tx = Math.atan2(iy - m.y, ix - m.x);
+            let da = ((tx - m.angle) % TAU + TAU) % TAU;
+            if (da > Math.PI) da -= TAU;
+            const mt = MISSILE_TURN * dt;
+            const turn = Math.max(-mt, Math.min(mt, da));
+            m.turnDir = Math.abs(da) > 0.05 ? (da > 0 ? 1 : -1) : 0; // 有効な旋回中は誘導スラスター噴射表示
+            m.angle += turn;
+          } else {
+            m.turnDir = 0; // 前方に目標がない: 直線飛行・旋回噴射なし
+          }
+        } else {
+          m.turnDir = 0; // ブースト中・燃料切れ・目標不在は直線飛行
+        }
+        if (!outOfFuel) {
+          m.velX += Math.cos(m.angle) * MISSILE_ACCEL * dt;
+          m.velY += Math.sin(m.angle) * MISSILE_ACCEL * dt;
+        }
+        const sp = Math.hypot(m.velX, m.velY);
         if (sp > MISSILE_MAX_SPEED) {
           const k = MISSILE_MAX_SPEED / sp;
           m.velX *= k;
           m.velY *= k;
-          sp = MISSILE_MAX_SPEED;
         }
         m.x += m.velX * dt;
         m.y += m.velY * dt;
-        m.dist += sp * dt;
+        // 煙の軌跡: 後方の位置を一定間隔で記録し、持続時間が過ぎた古い点を破棄
+        if (time - m.trailAt >= MISSILE_TRAIL_DT) {
+          m.trail.push({ x: m.x, y: m.y, t: time });
+          m.trailAt = time;
+        }
+        while (m.trail.length && time - m.trail[0].t > MISSILE_TRAIL_LIFE) m.trail.shift();
       }
-      // ミサイルの消滅: 自機命中（爆発）・敵機への偶発接触（爆発）・自機破壊時（全弾自爆）・
-      // ブラックホール吸収（無音）・航行距離・画面外で自爆
+      // ミサイルの消滅: 自機命中（爆発）・敵機への偶発接触（爆発）・ブラックホール吸収（無音）・
+      // 10 秒経過で自爆（爆発）・描画範囲外は無音で消滅（爆発なし）
       for (let i = missiles.length - 1; i >= 0; i--) {
         const m = missiles[i];
-        // 自機が破壊された場合: 航行中のミサイルは全て自爆
-        if (player.dead) {
-          explode(m, MISSILE_SEGS, m.velX * 0.4, m.velY * 0.4);
-          missiles.splice(i, 1);
-          enemy.arms.lastEnd = time;
-          continue;
-        }
-        const safe = time - m.born < MISSILE_FUSE; // 安全信管：発射直後は当たり判定なし
-        const hitPlayer = !safe && Math.hypot(m.x - player.x, m.y - player.y) < MISSILE_HIT_R;
+        const safe = time - m.born < MISSILE_BOOST; // 安全信管（= 一段目ブースト時間）: 当たり判定なし
+        const hitPlayer = !safe && !player.dead && Math.hypot(m.x - player.x, m.y - player.y) < MISSILE_HIT_R;
         // 信管解除後は、敵機にたまたま当たっても当たり判定とする（敵機が被弾・爆発）
         const hitEnemy = !safe && !enemy.dead && Math.hypot(m.x - enemy.x, m.y - enemy.y) < MISSILE_HIT_R;
         const absorbed = Math.hypot(m.x - bhcX, m.y - bhcY) < BH_HIT_R;
-        const selfBoom = m.dist >= MISSILE_RANGE;
-        const offScreen = m.x < -WRAP || m.x > width + WRAP || m.y < -WRAP || m.y > height + WRAP;
+        const selfBoom = time - m.born >= MISSILE_LIFE; // 10 秒経過で自爆
+        const offScreen = m.x < 0 || m.x > width || m.y < 0 || m.y > height; // 描画範囲外は無音で消滅
         if (!hitPlayer && !hitEnemy && !absorbed && !selfBoom && !offScreen) continue;
         if (hitPlayer) kill(player, PLAYER_SEGS, player.velX, player.velY);
         if (hitEnemy) kill(enemy, ENEMY_SEGS, enemy.velX, enemy.velY);
-        if (hitPlayer || hitEnemy || selfBoom || offScreen) explode(m, MISSILE_SEGS, m.velX * 0.4, m.velY * 0.4);
+        if (hitPlayer || hitEnemy || selfBoom) explode(m, MISSILE_SEGS, m.velX * 0.4, m.velY * 0.4);
         missiles.splice(i, 1);
         enemy.arms.lastEnd = time;
+      }
+      // 隕石: ランダム生成（同時 1〜8 個・上限 8 ・無い場合は約 1.5 秒以内に再出現）
+      if (time >= nextMeteor) {
+        if (meteors.length < METEOR_MAX) {
+          spawnMeteor();
+          nextMeteor = time + rnd(METEOR_SPAWN_MIN, METEOR_SPAWN_MAX);
+        } else {
+          nextMeteor = time + 0.5; // 上限に達している間はやや早めに再チェック
+        }
+      } else if (meteors.length === 0) {
+        nextMeteor = time + Math.min(nextMeteor - time, 1.5); // 隕石が 0 個なら 1.5 秒以内に出現させる
+      }
+      for (let i = meteors.length - 1; i >= 0; i--) {
+        const mt = meteors[i];
+        const mg = gravAt(mt); // 隕石も重力の影響を受ける
+        if (mg) {
+          mt.velX += mg.x * dt;
+          mt.velY += mg.y * dt;
+        }
+        mt.x += mt.velX * dt;
+        mt.y += mt.velY * dt;
+        mt.angle += mt.angleV * dt;
+        // 当たり判定: 自機・敵機に当たると船と隕石がともに爆発
+        let boom = false;
+        if (!player.dead && Math.hypot(mt.x - player.x, mt.y - player.y) < mt.r + METEOR_SHIP_HIT_R) {
+          kill(player, PLAYER_SEGS, player.velX, player.velY);
+          boom = true;
+        }
+        if (!enemy.dead && Math.hypot(mt.x - enemy.x, mt.y - enemy.y) < mt.r + METEOR_SHIP_HIT_R) {
+          kill(enemy, ENEMY_SEGS, enemy.velX, enemy.velY);
+          boom = true;
+        }
+        if (!boom && Math.hypot(mt.x - bhcX, mt.y - bhcY) < BH_HIT_R + mt.r) boom = true; // ブラックホール核心に触れると壊滅
+        const gone =
+          mt.x < -METEOR_OFFSCREEN || mt.x > width + METEOR_OFFSCREEN ||
+          mt.y < -METEOR_OFFSCREEN || mt.y > height + METEOR_OFFSCREEN;
+        if (boom) explode(mt, mt.segs, mt.velX * 0.4, mt.velY * 0.4);
+        if (boom || gone) meteors.splice(i, 1);
       }
       // 当たり判定: ビーム vs 船 / ビーム vs ブラックホール / 船 vs ブラックホール / 自機 vs 敵機
       for (let i = bullets.length - 1; i >= 0; i--) {
@@ -617,7 +815,6 @@ export default function SpaceWarsBackground() {
       }
       // 終了した爆発を削除
       explosions = explosions.filter((e) => time - e.t0 < EXP_DUR);
-      bullets = bullets.filter((m) => m.life < BULLET_LIFE);
     };
 
     const drawFrame = () => {
@@ -631,17 +828,10 @@ export default function SpaceWarsBackground() {
         ctx.fill();
       }
 
-      // 重力圏（薄い広い円）
+      // ブラックホール本体（アスタリスク型の線画・ゆっくり回転。重力圏の大きな円は描画しない）
       const bhcX = width * BH_X;
       const bhcY = height * BH_Y;
-      const gravR = Math.min(width, height) * GRAV_R_FRAC;
       ctx.lineWidth = 1;
-      ctx.strokeStyle = `rgba(${LINE}, 0.1)`;
-      ctx.beginPath();
-      ctx.arc(bhcX, bhcY, gravR, 0, TAU);
-      ctx.stroke();
-
-      // ブラックホール本体（アスタリスク型の線画・ゆっくり回転）
       const rot = time * 0.25;
       ctx.strokeStyle = `rgba(${LINE}, 0.42)`;
       for (let i = 0; i < 3; i++) {
@@ -658,6 +848,22 @@ export default function SpaceWarsBackground() {
       ctx.arc(bhcX, bhcY, 9, 0, TAU);
       ctx.stroke();
 
+      // 隕石（不規則多角形の線画・ゆっくり自転する漂遊要素）
+      ctx.strokeStyle = `rgba(${LINE}, 0.4)`;
+      for (const mt of meteors) {
+        const c = Math.cos(mt.angle);
+        const s = Math.sin(mt.angle);
+        ctx.beginPath();
+        mt.pts.forEach(([px, py], i2) => {
+          const wx = mt.x + px * c - py * s;
+          const wy = mt.y + px * s + py * c;
+          if (i2 === 0) ctx.moveTo(wx, wy);
+          else ctx.lineTo(wx, wy);
+        });
+        ctx.closePath();
+        ctx.stroke();
+      }
+
       // 弾（短い線）
       ctx.strokeStyle = `rgba(${LINE}, 0.45)`;
       for (const m of bullets) {
@@ -667,18 +873,36 @@ export default function SpaceWarsBackground() {
         ctx.stroke();
       }
 
-      // ミサイル（短い線 + 尾部のちる小型噴射。機首方向を向き慣性で移動）
-      ctx.strokeStyle = `rgba(${LINE}, 0.5)`;
+      // ミサイルの煙の軌跡（後方に残ってじわっと消える霧。新しい点ほど小さく濃く）
       for (const m of missiles) {
+        for (const p of m.trail) {
+          const f = 1 - (time - p.t) / MISSILE_TRAIL_LIFE; // 1（新）→ 0（古）
+          if (f <= 0) continue;
+          puff(p.x, p.y, 1.1 + (1 - f) * 2.2, 0.14 * f);
+        }
+      }
+      // ミサイル（短い線。ブースト → 誘導の 2 段飛行。加速噴射＋誘導スラスター噴射）
+      ctx.strokeStyle = `rgba(${LINE}, 0.5)`;
+      for (let i = 0; i < missiles.length; i++) {
+        const m = missiles[i];
         const c = Math.cos(m.angle);
         const s = Math.sin(m.angle);
-        const flick = 3 + 2.5 * Math.abs(Math.sin(time * 28 + m.dist));
         ctx.beginPath();
         ctx.moveTo(m.x - c * 3.5, m.y - s * 3.5);
         ctx.lineTo(m.x + c * 3.5, m.y + s * 3.5);
-        ctx.moveTo(m.x - c * 3.5, m.y - s * 3.5);
-        ctx.lineTo(m.x - c * (3.5 + flick), m.y - s * (3.5 + flick));
         ctx.stroke();
+        ctx.save();
+        ctx.translate(m.x, m.y);
+        ctx.rotate(m.angle);
+        // 加速噴射: 後方中央の単一ジェット（自機/敵機と同様）。最高速度到達後・燃料切れ後は出さない
+        if (time - m.born < MISSILE_FUEL_TIME && Math.hypot(m.velX, m.velY) < MISSILE_MAX_SPEED) {
+          missileThrustPuffs(i * 0.6);
+        }
+        // 誘導スラスター噴射: 右旋回は先頭左＋後部右、左旋回は先頭右＋後部左
+        if (m.turnDir !== 0) {
+          missileGuidePuffs(m.turnDir, i * 0.6);
+        }
+        ctx.restore();
       }
 
       // 爆発（船を構成する直線が慣性を継いで回転しながら放射状に散り、フェードアウト）
@@ -741,7 +965,9 @@ export default function SpaceWarsBackground() {
         ctx.lineTo(-27, -8);
         ctx.stroke();
         // 前方スラスター: 後方中央の単一ジェット（自機と同一。霧が断続噴出）
-        if (eAlpha >= 1 && enemy.thrust) {
+        // 加速停止条件（step と同一: 進行方向の速度が最高速度）に合せて噴射演出も止める
+        const eFwd = enemy.velX * Math.cos(enemy.angle) + enemy.velY * Math.sin(enemy.angle);
+        if (eAlpha >= 1 && enemy.thrust && eFwd < ENEMY_MAX_SPEED) {
           const flick = 0.4 + 0.6 * Math.abs(Math.sin(time * 26));
           for (let i = 0; i < 3; i++) {
             const d = 5 + i * 5;
@@ -871,10 +1097,12 @@ export default function SpaceWarsBackground() {
       }
     };
 
-    // タブ非表示時は描画停止、再表示時は再開
+    // タブ非表示時は描画停止（非表示中にキーを離した場合 keyup が届かないためキー状態もクリア）、再表示時は再開
     const onVisibility = () => {
-      if (document.hidden) stop();
-      else start();
+      if (document.hidden) {
+        stop();
+        clearKeys();
+      } else start();
     };
 
     // reduced motion 設定が変わったらアニメーション / 静止を切替
@@ -884,13 +1112,39 @@ export default function SpaceWarsBackground() {
       else start();
     };
 
-    // キーボード操作（W: 前進 / S: 後進 / A・D: 回転 / スペース: 弾発射）
-    const keyOf = (e) => (e.key === ' ' ? 'space' : e.key.toLowerCase());
+    // キーボード操作（W: 前進 / S: 後進 / A・D: 回転 / スペース: レーザー連射）
+    // e.code（物理キー）で判定するため、日本語 IME・CapsLock・キーボードレイアウトに依存しない
+    // Ctrl / Meta / Alt 押下中の keydown は無視: ショートカット（Ctrl+S・Alt+Tab 等）で
+    // ブラウザが横取りし keyup がページに届かなくなり、キー状態が固着するのを防ぐ
+    const keyOf = (e) => {
+      switch (e.code) {
+        case 'KeyW':
+          return 'w';
+        case 'KeyA':
+          return 'a';
+        case 'KeyS':
+          return 's';
+        case 'KeyD':
+          return 'd';
+        case 'Space':
+          return 'space';
+        default:
+          return '';
+      }
+    };
     const isControlKey = (k) =>
       k === 'w' || k === 'a' || k === 's' || k === 'd' || k === 'space';
+    const clearKeys = () => {
+      keys.w = false;
+      keys.a = false;
+      keys.s = false;
+      keys.d = false;
+      keys.space = false;
+    };
     const onKeyDown = (e) => {
       const k = keyOf(e);
       if (!isControlKey(k)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return; // ショートカット経由の keyup 欠落による固着防止
       const t = e.target;
       if (
         t &&
@@ -905,11 +1159,7 @@ export default function SpaceWarsBackground() {
       if (isControlKey(k)) keys[k] = false;
     };
     const onWindowBlur = () => {
-      keys.w = false;
-      keys.a = false;
-      keys.s = false;
-      keys.d = false;
-      keys.space = false;
+      clearKeys();
     };
 
     resize();
