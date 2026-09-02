@@ -16,7 +16,7 @@ import { useEffect, useRef } from 'react';
  *   - レーザー: 機首 0°（正面真直前）の方向にしか撃てない 4 連射（0.3 秒間隔）。
  *     照準はあいまいなリード予測（1 回リード + ランダム誤差）で、その予測位置が
  *     機首方向の狭い扇（±約 14°）に入るたび発射。連射後 2 秒のクールタイム。
- *     弾は射程 ENEMY_LASER_RANGE（400px）到達で消滅する。
+ *     弾は画面外に出た瞬間に消滅する。自機に当たると距離に応じて跳ね返されることがある。
  *   - 誘導ミサイルを片舷 2 発・計 4 発装備。内側→外側・左→右の順で 3 秒かけて装填し、
  *     揃ったら 1 秒間隔で順次発射。自機の到達予測位置（距離 ÷ ミサイル最大速度で進んだ位置）
  *     が機首方向 ±30° の内側にあるときのみ発射
@@ -32,7 +32,7 @@ import { useEffect, useRef } from 'react';
  * - ブラックホール（アスタリスク型の線画。
  *   重力圏内にいる船は距離の二乗に反比例した重力で引き寄せられる。圏の境界線は描画しない）
  * - 弾丸（短い直線。自機レーザーは射程制限なく画面外に出た瞬間に消滅。
- *   敵機レーザーは射程 ENEMY_LASER_RANGE に達した瞬間に消滅）
+ *   敵機レーザーは画面外に出た瞬間に消滅）
  * - 隕石（自機・敵機よりやや小さい不規則多角形。速度・方向ランダムで画面外から
  *   流れ込み、重力の影響を受けながら漂う。自機・敵機に当たると船と隕石がともに爆発。
  *   同時 1〜12 個、画面外へ出たりブラックホール核心に触れたりすると消滅）
@@ -83,7 +83,8 @@ const LASER_RELOAD = 2; // 4 発目が終わった後、次の連射までのク
 const LASER_FIRE_CONE = 0.25; // 発射できる正面扇（機首 0° 中心 ±約 14°）
 const LASER_LEAD = 0.6; // リード予測率（1 未満で予測を甘くする）
 const LASER_AIM_ERR = 40; // 照準のランダム誤差（px。射線予測をあいまいにする）
-const ENEMY_LASER_RANGE = 400; // 敵機レーザーの射程（px）。この距離を飛行したら消滅（自機レーザーは射程制限なし）
+const ENEMY_LASER_DEFLECT_RANGE = 800; // 跳ね返し確率が最大値に達する距離（px）
+const ENEMY_LASER_DEFLECT_MAX = 0.4; // 最大の跳ね返し確率（距離が長いほど高くなる）
 
 // 当たり判定・爆発・ワープ
 const EXP_DUR = 0.9; // 爆発（線分が散開・フェード）の持続時間（秒）
@@ -628,7 +629,6 @@ export default function SpaceWarsBackground() {
               y: enemy.y + Math.sin(enemy.angle) * 14,
               a: enemy.angle, // 機首 0°（正面真直前）のみ
               o: 'e',
-              d: 0, // 移動距離（射程制限用）
             });
             laserShot += 1;
             nextEnemyFire =
@@ -637,15 +637,13 @@ export default function SpaceWarsBackground() {
           }
         }
       }
-      // 弾: 直線飛行し、画面外に出た瞬間に消滅。敵機レーザーのみ射程 ENEMY_LASER_RANGE で消滅
+      // 弾: 直線飛行し、画面外に出た瞬間に消滅（自機・敵機ともに射程制限なし）
       for (let i = bullets.length - 1; i >= 0; i--) {
         const m = bullets[i];
         m.x += Math.cos(m.a) * BULLET_SPEED * dt;
         m.y += Math.sin(m.a) * BULLET_SPEED * dt;
-        if (m.o === 'e') m.d += BULLET_SPEED * dt; // 移動距離の蓄積（敵機レーザーのみ）
         if (
-          m.x < -WRAP || m.x > width + WRAP || m.y < -WRAP || m.y > height + WRAP ||
-          (m.o === 'e' && m.d >= ENEMY_LASER_RANGE)
+          m.x < -WRAP || m.x > width + WRAP || m.y < -WRAP || m.y > height + WRAP
         ) {
           bullets.splice(i, 1);
         }
@@ -796,7 +794,12 @@ export default function SpaceWarsBackground() {
           if (m.o === 'p') {
             kill(enemy, ENEMY_SEGS, enemy.velX, enemy.velY);
           } else {
-            kill(player, PLAYER_SEGS, player.velX, player.velY);
+            // 跳ね返し判定: 敵機との距離が長いほど跳ね返す確率が高い
+            const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+            const deflectProb = ENEMY_LASER_DEFLECT_MAX * Math.min(1, dist / ENEMY_LASER_DEFLECT_RANGE);
+            if (Math.random() >= deflectProb) {
+              kill(player, PLAYER_SEGS, player.velX, player.velY);
+            } // 跳ね返された場合は何もしない（弾は既に削除済み）
           }
         } else if (Math.hypot(m.x - bhcX, m.y - bhcY) < BH_HIT_R) {
           bullets.splice(i, 1); // ブラックホールに吸収される
