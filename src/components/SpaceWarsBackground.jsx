@@ -16,7 +16,8 @@ import { useEffect, useRef } from 'react';
  *   - レーザー: 機首 0°（正面真直前）の方向にしか撃てない 4 連射（0.3 秒間隔）。
  *     照準はあいまいなリード予測（1 回リード + ランダム誤差）で、その予測位置が
  *     機首方向の狭い扇（±約 14°）に入るたび発射。連射後 2 秒のクールタイム。
- *     弾は画面外に出た瞬間に消滅する。自機に当たると距離に応じて跳ね返されることがある。
+ *     弾は画面外に出た瞬間に消滅する。自機に当たると距離に応じて自機を鏡面として
+ *     法線反射し、自機レーザーとして転換して飛んでいく（跳ね返されなかった場合は直撃）
  *   - 誘導ミサイルを片舷 2 発・計 4 発装備。内側→外側・左→右の順で 3 秒かけて装填し、
  *     揃ったら 1 秒間隔で順次発射。自機の到達予測位置（距離 ÷ ミサイル最大速度で進んだ位置）
  *     が機首方向 ±30° の内側にあるときのみ発射
@@ -93,6 +94,9 @@ const WARP_DUR = 0.55; // ワープ演出の持続時間（秒）
 const BH_HIT_R = 13; // ブラックホールとの接触判定半径
 const SHIP_HIT_R = 20; // 自機・敵機の衝突判定距離
 const BULLET_SHIP_HIT_R = 15; // 弾 vs 船の接触判定半径
+const BULLET_METEOR_HIT_PAD = 4; // 弾 vs 隕石の追加接触半径（隕石の半径に足す）
+const BULLET_MISSILE_HIT_R = 10; // 弾 vs ミサイルの接触判定半径
+const MISSILE_METEOR_HIT_PAD = 6; // ミサイル vs 隕石の追加接触半径（隕石の半径に足す）
 const REAPPEAR_SPEED = 100; // 出現直後の進行方向の初速度（px/s）
 
 // 敵機の慣性挙動（低頻度で方向転換・前後噴射を決める）
@@ -786,24 +790,83 @@ export default function SpaceWarsBackground() {
         }
       }
 
-      // 当たり判定: ビーム vs 船 / ビーム vs ブラックホール / 船 vs ブラックホール / 自機 vs 敵機
+      // 当たり判定: ビーム vs 船 / ブラックホール / 隕石 / ミサイル
       for (let i = bullets.length - 1; i >= 0; i--) {
         const m = bullets[i];
+        let removeBullet = false;
         const target = m.o === 'p' ? enemy : player;
         if (!target.dead && Math.hypot(m.x - target.x, m.y - target.y) < BULLET_SHIP_HIT_R) {
-          bullets.splice(i, 1);
           if (m.o === 'p') {
+            removeBullet = true;
             kill(enemy, ENEMY_SEGS, enemy.velX, enemy.velY);
           } else {
             // 跳ね返し判定: 敵機との距離が長いほど跳ね返す確率が高い
             const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
             const deflectProb = ENEMY_LASER_DEFLECT_MAX * Math.min(1, dist / ENEMY_LASER_DEFLECT_RANGE);
             if (Math.random() >= deflectProb) {
+              removeBullet = true;
               kill(player, PLAYER_SEGS, player.velX, player.velY);
-            } // 跳ね返された場合は何もしない（弾は既に削除済み）
+            } else {
+              // 反射: プレイヤーを鏡面としてレーザーを反射（法線反射）
+              const nx = m.x - player.x;
+              const ny = m.y - player.y;
+              const nd = Math.hypot(nx, ny) || 1;
+              const nnx = nx / nd;
+              const nny = ny / nd;
+              const vx = Math.cos(m.a);
+              const vy = Math.sin(m.a);
+              const dot = vx * nnx + vy * nny;
+              m.a = Math.atan2(vy - 2 * dot * nny, vx - 2 * dot * nnx);
+              m.o = 'p'; // 自機弾に転換（敵機への命中判定が有効になる）
+              m.x = player.x + nnx * (BULLET_SHIP_HIT_R + 2);
+              m.y = player.y + nny * (BULLET_SHIP_HIT_R + 2);
+            }
           }
-        } else if (Math.hypot(m.x - bhcX, m.y - bhcY) < BH_HIT_R) {
-          bullets.splice(i, 1); // ブラックホールに吸収される
+        }
+        if (!removeBullet && Math.hypot(m.x - bhcX, m.y - bhcY) < BH_HIT_R) {
+          removeBullet = true; // ブラックホールに吸収される
+        }
+        if (!removeBullet) {
+          // ビーム vs 隕石
+          for (let j = meteors.length - 1; j >= 0; j--) {
+            const mt = meteors[j];
+            if (Math.hypot(m.x - mt.x, m.y - mt.y) < mt.r + BULLET_METEOR_HIT_PAD) {
+              explode(mt, mt.segs, mt.velX * 0.4, mt.velY * 0.4, true);
+              meteors.splice(j, 1);
+              removeBullet = true;
+              break;
+            }
+          }
+        }
+        if (!removeBullet) {
+          // ビーム vs ミサイル
+          for (let j = missiles.length - 1; j >= 0; j--) {
+            const ms = missiles[j];
+            if (Math.hypot(m.x - ms.x, m.y - ms.y) < BULLET_MISSILE_HIT_R) {
+              explode(ms, MISSILE_SEGS, ms.velX * 0.4, ms.velY * 0.4, true);
+              missiles.splice(j, 1);
+              enemy.arms.lastEnd = time;
+              removeBullet = true;
+              break;
+            }
+          }
+        }
+        if (removeBullet) bullets.splice(i, 1);
+      }
+      // ミサイル vs 隕石（安全信管解除後のみ当たり判定）
+      for (let i = missiles.length - 1; i >= 0; i--) {
+        const ms = missiles[i];
+        if (time - ms.born < MISSILE_SAFE) continue;
+        for (let j = meteors.length - 1; j >= 0; j--) {
+          const mt = meteors[j];
+          if (Math.hypot(ms.x - mt.x, ms.y - mt.y) < mt.r + MISSILE_METEOR_HIT_PAD) {
+            explode(ms, MISSILE_SEGS, ms.velX * 0.4, ms.velY * 0.4, true);
+            explode(mt, mt.segs, mt.velX * 0.4, mt.velY * 0.4, true);
+            missiles.splice(i, 1);
+            meteors.splice(j, 1);
+            enemy.arms.lastEnd = time;
+            break;
+          }
         }
       }
       if (!player.dead && Math.hypot(player.x - bhcX, player.y - bhcY) < BH_HIT_R) {
