@@ -95,7 +95,7 @@ const BULLET_SHIP_HIT_R = 15; // 弾 vs 船の接触判定半径
 const REAPPEAR_SPEED = 100; // 出現直後の進行方向の初速度（px/s）
 
 // 敵機の慣性挙動（低頻度で方向転換・前後噴射を決める）
-const ENEMY_ACCEL = 42; // 敵機・前方スラスターの加速度（px/s^2）
+const ENEMY_ACCEL = 14; // 敵機・前方スラスターの加速度（px/s^2）。約 3 秒の噴射で最大速度に到達（41/14 ≒ 2.9 秒）
 const ENEMY_BRAKE = 17; // 敵機・後方スラスターの減速度（px/s^2）
 const ENEMY_MAX_SPEED = 41; // 敵機速度上限（px/s）
 const ENEMY_TURN = 0.45; // 敵機の回転速度（rad/s）
