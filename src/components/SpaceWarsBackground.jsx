@@ -64,6 +64,7 @@ const GRAV_R_FRAC = 0.36; // 重力圏の半径（width/height の小数比）
 const GRAV_STRENGTH = 420000; // 重力強度（距離の二乗に反比例して強くなる）
 const GRAV_MIN_DIST = 25; // 重力計算の最小距離（特異点回避）
 const WRAP = 40; // 画面端でのラップマージン
+const PLAY_AREA_INSET = 64; // プレイエリアのインセット（px）。canvas はこの分だけ画面内側に配置（CSS の inset と一致）
 
 // 自機の物理（宇宙空間のため摩擦なし・加速した速度は維持）
 const ACCEL = 98; // 加速度（px/s^2）
@@ -1088,8 +1089,8 @@ export default function SpaceWarsBackground() {
     // canvas サイズを再構築して描画（devicePixelRatio を反映）
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      width = window.innerWidth;
-      height = window.innerHeight;
+      width = window.innerWidth - 2 * PLAY_AREA_INSET;
+      height = window.innerHeight - 2 * PLAY_AREA_INSET;
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

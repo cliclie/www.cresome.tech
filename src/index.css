@@ -194,6 +194,9 @@ body {
   z-index: 0;
   pointer-events: none;
 }
+.sw-bg {
+  inset: 64px; /* プレイエリアを画面内側へ 64px インセット（JS の PLAY_AREA_INSET と一致） */
+}
 
 /* ---------- Background switcher (bottom of right menu) ---------- */
 .bg-switcher {
