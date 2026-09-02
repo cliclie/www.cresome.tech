@@ -11,8 +11,9 @@ import { useEffect, useRef } from 'react';
  *   クールタイム。キーを離すと残りの連射はキャンセル）
  * - 敵機（クルーザー：前面は V 字開口の円、後方はテールフィン 2 本。AI 漂遊）
  *   - 慣性移動し、低頻度で旋回・前後スラスター噴射（加減速）。前方噴射は後方中央の
- *     単一ジェット（自機と同一）。進行方向の速度が上限に達するまでは加速し、到達後は
- *     加速も噴射表示も停止。旋回中は前後の舷側から RCS 小噴射
+ *     単一ジェット（自機と同一）。進行方向の速度が停止閾値（最高速度より低い値）に
+ *     達するまで加速し、到達後は加速も噴射表示も停止。主スラスターは連続噴射 1 秒で停止。
+ *     旋回中は前後の舷側から RCS 小噴射
  *   - レーザー: 機首 0°（正面真直前）の方向にしか撃てない 4 連射（0.3 秒間隔）。
  *     照準はあいまいなリード予測（1 回リード + ランダム誤差）で、その予測位置が
  *     機首方向の狭い扇（±約 14°）に入るたび発射。連射後 2 秒のクールタイム。
@@ -100,9 +101,11 @@ const MISSILE_METEOR_HIT_PAD = 6; // ミサイル vs 隕石の追加接触半径
 const REAPPEAR_SPEED = 100; // 出現直後の進行方向の初速度（px/s）
 
 // 敵機の慣性挙動（低頻度で方向転換・前後噴射を決める）
-const ENEMY_ACCEL = 20.5; // 敵機・前方スラスターの加速度（px/s^2）。約 2 秒の噴射で最大速度に到達（41/20.5 = 2 秒）
+const ENEMY_ACCEL = 30.75; // 敵機・前方スラスターの加速度（px/s^2）。前値 20.5 の 1.5 倍（加速 50% 増）
 const ENEMY_BRAKE = 17; // 敵機・後方スラスターの減速度（px/s^2）
 const ENEMY_MAX_SPEED = 41; // 敵機速度上限（px/s）
+const ENEMY_THRUST_STOP_SPEED = 40; // 主スラスター停止の閾値（px/s）。最高速度より下げて、この速度成分に達したら加速停止
+const ENEMY_THRUST_MAX_DUR = 1; // 主スラスターの最大噴射持続時間（秒）。1 秒超の連続噴射を防ぐ
 const ENEMY_TURN = 0.45; // 敵機の回転速度（rad/s）
 
 // 誘導ミサイル（敵機。片舷 2 発×2 舷 = 4 発。内側→外側・左→右の順で 3 秒かけて装填）
@@ -243,6 +246,7 @@ export default function SpaceWarsBackground() {
         velY: 0,
         turn: 0, // 現在の回転速度（rad/s）
         thrust: false, // 前方スラスター噴射中
+        thrustUntil: 0, // 前方スラスター噴射の期限（time で管理）
         brake: false, // 後方スラスター噴射中
         brakeUntil: 0,
         nextAction: time + rnd(2, 4), // 次の操縦判断の時刻
@@ -410,6 +414,7 @@ export default function SpaceWarsBackground() {
       ship.angle = Math.random() * TAU; // ランダムな向きで向き直す
       ship.velX = 0; // 死亡時の旧速度をクリアし、船体表示と運動方向を一致させる
       ship.velY = 0;
+      ship.thrustUntil = 0; // 再出現時にスラスター期限をリセット
       ship.dead = false;
       ship.warp = { t0: time };
       ship.pendingBoost = true;
@@ -532,6 +537,7 @@ export default function SpaceWarsBackground() {
           const t = Math.random();
           if (t < 0.45) {
             enemy.thrust = true;
+            enemy.thrustUntil = time + ENEMY_THRUST_MAX_DUR; // 主スラスターは 1 秒超噴射しない
             enemy.brake = false;
           } else if (t < 0.62) {
             enemy.thrust = false;
@@ -544,11 +550,12 @@ export default function SpaceWarsBackground() {
           enemy.nextAction = time + rnd(3, 7);
         }
         if (enemy.brake && time >= enemy.brakeUntil) enemy.brake = false;
+        if (enemy.thrust && time >= enemy.thrustUntil) enemy.thrust = false; // 主スラスターは連続噴射 1 秒で停止
         enemy.angle += enemy.turn * dt;
-        // 加速停止は「進行方向（機首方向）の速度が最高速度に達したとき」のみ。
+        // 加速停止は「進行方向（機首方向）の速度が停止閾値に達したとき」または「1 秒噴射期限切れ」のみ。
         // 横方向の慣性移動中や、機首を反転させて減速（逆進）している場合はスラスターを維持できる
         const eFwd = enemy.velX * Math.cos(enemy.angle) + enemy.velY * Math.sin(enemy.angle);
-        if (enemy.thrust && eFwd < ENEMY_MAX_SPEED) {
+        if (enemy.thrust && eFwd < ENEMY_THRUST_STOP_SPEED) {
           enemy.velX += Math.cos(enemy.angle) * ENEMY_ACCEL * dt;
           enemy.velY += Math.sin(enemy.angle) * ENEMY_ACCEL * dt;
         }
@@ -1054,9 +1061,9 @@ export default function SpaceWarsBackground() {
         ctx.lineTo(-27, -8);
         ctx.stroke();
         // 前方スラスター: 後方中央の単一ジェット（自機と同一。霧が断続噴出）
-        // 加速停止条件（step と同一: 進行方向の速度が最高速度）に合せて噴射演出も止める
+        // 加速停止条件（step と同一: 進行方向の速度が閾値 or 1 秒噴射期限）に合せて噴射演出も止める
         const eFwd = enemy.velX * Math.cos(enemy.angle) + enemy.velY * Math.sin(enemy.angle);
-        if (eAlpha >= 1 && enemy.thrust && eFwd < ENEMY_MAX_SPEED) {
+        if (eAlpha >= 1 && enemy.thrust && eFwd < ENEMY_THRUST_STOP_SPEED) {
           const flick = 0.4 + 0.6 * Math.abs(Math.sin(time * 26));
           for (let i = 0; i < 3; i++) {
             const d = 5 + i * 5;
