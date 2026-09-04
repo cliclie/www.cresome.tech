@@ -1,0 +1,15 @@
+# 生データ・成果物（大容量のため管理対象外 / Synology同期も除外推奨）
+data/
+out/
+out_*/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Node
+node_modules/
+
+# 実行ログ
+*.log

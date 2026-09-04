@@ -444,3 +444,14 @@ publish ブランチには以下のファイルのみ存在します:
   4. 入力: 左ドラッグ = 回転、右ドラッグ or Shift+ドラッグ = パン、ホイール = ズーム（preventDefault でページスクロール阻止）、WASD / 矢印キー = 回転、Q/E = 上下移動、R = カメラリセット
   5. 背景 canvas は `pointer-events: none` のため window 側で受信し、イベントのターゲットが背景コンテナ（`body` / `.main` / `.page` 等）のときのみカメラ操作を受け継ぐ。ボタン・スライダー・テキスト上では無効で既存 UI と干渉しない。ウィンドウ blur 時にキー状態をクリアし、アンマウント時に全リスナーを解除
 - **検証（実施済み）**: `npm run build` 成功（vite build、エラーなし）
+
+### 2026-09-04: GLB 地図データ生成ワークスペース（map/）を追加、サイトへの移行は保留
+
+- **要望**:
+  1. 別途作成していた大塚 3D マップのデータ生成ワークスペース（Python パイプライン + three.js ローカルビュワー）をリポジトリに取り込み git 管理する
+  2. サイトの地図モードをこの GLB データへ移行する（7 駅 × クリサムへの経路）
+- **現状**:
+  1. `map/` ワークスペースをコミット済み: パイプライン本体（`map/src/`）・起動スクリプト（`map/scripts/`）・独立ビュワー（`map/viewer/`）・`map/README.md`・`requirements.txt`
+  2. 生データ `map/data/`（約 5 GB: PLATEAU CityGML + OSM）と成果物 `map/out/`・`map/out_white/`（各約 11 MB: 9 レイヤー GLB + manifest.json）はコミット対象外（`map/.gitignore` 除外）。すべて Synology Drive 同期（バックアップ）の対象として保持
+  3. サイトの地図モードは引き続き `src/data/otsuka-map.json`（合成データ: 建物 69 棟 / 路線 2 / ルート 3 経路）を使用 — GLB への移行は未実施
+  4. 今後の移行作業の詳細は `TODO.md` に記載
