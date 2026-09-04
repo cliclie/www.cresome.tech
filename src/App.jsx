@@ -4,6 +4,8 @@ import Topbar from './components/Topbar';
 import Drawer from './components/Drawer';
 import WaveBackground from './components/WaveBackground';
 import SpaceWarsBackground from './components/SpaceWarsBackground';
+import MapBackground from './components/MapBackground';
+import MapControls from './components/MapControls';
 import Home from './pages/Home';
 import Business from './pages/Business';
 import Flow from './pages/Flow';
@@ -16,6 +18,16 @@ const PAGES = [
   { id: 'company', label: '会社概要', Component: Company },
 ];
 
+// 地図モードのデフォルト設定
+const MAP_CONFIG_KEY = 'cresome.mapConfig';
+const defaultMapConfig = {
+  stationId: 'otsuka',
+  viewpoint: 'walking',
+  direction: 1,
+  speed: 5,
+  playing: true,
+};
+
 export default function App() {
   const [current, setCurrent] = useState('home');
   const [leaving, setLeaving] = useState(false);
@@ -23,16 +35,30 @@ export default function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [bgMode, setBgMode] = useState(
     () =>
-      window.localStorage.getItem('cresome.bgMode') === 'spacewars'
-        ? 'spacewars'
-        : 'wave'
+      window.localStorage.getItem('cresome.bgMode') || 'wave'
   );
+
+  // 地図モードの設定（駅・視点・向き・速度）
+  const [mapConfig, setMapConfig] = useState(() => {
+    try {
+      const saved = window.localStorage.getItem(MAP_CONFIG_KEY);
+      return saved ? { ...defaultMapConfig, ...JSON.parse(saved) } : defaultMapConfig;
+    } catch {
+      return defaultMapConfig;
+    }
+  });
+
   const transitioningRef = useRef(false);
 
   // 背景モードの永続化
   useEffect(() => {
     window.localStorage.setItem('cresome.bgMode', bgMode);
   }, [bgMode]);
+
+  // 地図設定の永続化
+  useEffect(() => {
+    window.localStorage.setItem(MAP_CONFIG_KEY, JSON.stringify(mapConfig));
+  }, [mapConfig]);
 
   // reveal（フェードイン）: 表示された要素を IntersectionObserver で検出
   useEffect(() => {
@@ -77,18 +103,38 @@ export default function App() {
     active: p.id === current,
   }));
 
+  const updateMapConfig = (updates) => {
+    setMapConfig((prev) => ({ ...prev, ...updates }));
+  };
+
+  // 停止（始点に戻る）: トークンを増やすたびに MapBackground がルートをリセット
+  const [mapResetToken, setMapResetToken] = useState(0);
+  const resetMapRoute = () => setMapResetToken((n) => n + 1);
+
   return (
     <>
       {bgMode === 'wave' ? (
         <WaveBackground />
-      ) : (
+      ) : bgMode === 'spacewars' ? (
         <SpaceWarsBackground />
+      ) : (
+        <MapBackground
+          stationId={mapConfig.stationId}
+          viewpoint={mapConfig.viewpoint}
+          direction={mapConfig.direction}
+          speed={mapConfig.speed}
+          playing={mapConfig.playing}
+          resetToken={mapResetToken}
+        />
       )}
       <Sidebar
         items={navItems}
         onSelect={showPage}
         bgMode={bgMode}
         onBgModeChange={setBgMode}
+        mapConfig={mapConfig}
+        onMapConfigChange={updateMapConfig}
+        onMapReset={resetMapRoute}
       />
       <Topbar onMenu={() => setDrawerOpen(true)} />
       <Drawer
@@ -98,6 +144,9 @@ export default function App() {
         onSelect={showPage}
         bgMode={bgMode}
         onBgModeChange={setBgMode}
+        mapConfig={mapConfig}
+        onMapConfigChange={updateMapConfig}
+        onMapReset={resetMapRoute}
       />
 
       <main className="main">

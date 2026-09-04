@@ -1,5 +1,5 @@
 /**
- * 背景エフェクト切替（波 / 宇宙船）
+ * 背景エフェクト切替（波 / 宇宙船 / 地図）
  * 右サイドバー（デスクトップ）とドロワー（モバイル）の下部に配置。
  */
 export default function BgSwitcher({ value, onChange }) {
@@ -22,6 +22,13 @@ export default function BgSwitcher({ value, onChange }) {
           onClick={() => onChange('spacewars')}
         >
           宇宙船
+        </button>
+        <button
+          type="button"
+          className={'bg-switcher-btn' + (value === 'map' ? ' active' : '')}
+          onClick={() => onChange('map')}
+        >
+          地図
         </button>
       </div>
     </div>
