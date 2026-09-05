@@ -15,20 +15,19 @@
 - **publish ブランチ**: 公開ファイルのみ（dist/ 経由の GLB + manifest）。生成スクリプト・元データは載せない
 - **Synology 同期**: 全ファイルを同期対象のまま（バックアップ用途・除外しない）
 
-## 1. map/ パイプラインの整備
-- [ ] `map/src/config.py` に `DATA_DIR` を追加（`os.environ.get("MAP_DATA_DIR", デフォルト ROOT/data)`）
-- [ ] 各スクリプトの `data/` ハードコードパスを `config.DATA_DIR` に統一:
+## 1. map/ パイプラインの整備（2026-09-04 完了）
+- [x] `map/src/config.py` に `DATA_DIR` を追加（`os.environ.get("MAP_DATA_DIR", デフォルト ROOT/data)`）
+- [x] 各スクリプトの `data/` ハードコードパスを `config.DATA_DIR` に統一:
       `pipeline.py`（`DATA = ROOT / "data"`）, `fetch_osm.py`（out_dir）, `fetch_cresome.py`（OUT）, `inspect_dem_local.py`, `terrain.py`（要確認）
-- [ ] `map/src/fetch_osm.py` に highway query 追加 → `data/osm/highways.json`
-      （`way["highway"]~"^(primary|secondary|tertiary|residential|unclassified|living_street|service)$"({bbox}); out geom;`）
-- [ ] 新規 `map/src/routes.py`:
+- [x] highway 取得 → `data/osm/highways.json`（`map/scripts/download_highways.py` で取得）
+- [x] 新規 `map/src/routes.py`:
       - OSM highway ways から道路グラフ構築（共有端点 = ノード、重み = セグメント距離）
-      - manifest の 7 駅 + クリサム位置の最寄ノード特定
-      - Dijkstra（heapq）で最短路計算 → ENU ポリライン `[[x, y], ...]` を `out/routes.json` に出力
+      - manifest の 10 起点 + クリサム位置のスナップ（SNAP_RADIUS 25m・往復コスト比較）
+      - Dijkstra（heapq）で最短路計算 → ENU ポリライン `[[x, y, z], ...]` を `out/routes.json` に出力
       - 失敗時（最寄道路がない等）は直線接続フォールバック + 警告出力
-- [ ] `map/src/pipeline.py` にルート生成ステップを追加し、`manifest.json` に `"routes"` キーを同梱
-- [ ] `map/README.md` の "De sription" typo 修正 + `inspect_*.py` / `out_white/` の構造説明追記
-- [ ] パイプライン実行で出物検証（GLB + routes 入り manifest、`verify_glb.py` / `viewer/` で目視）
+- [x] `map/src/pipeline.py` にルート生成ステップを追加し、`manifest.json` に `routes.json` を同梱
+- [x] `map/README.md` の "De sription" typo 修正 + 構成・`out_white/` の構造説明追記
+- [x] パイプライン実行で出物検証（GLB + routes、`verify_glb.py` / `verify_changes.py` / `viewer/` で目視）
 
 ## 2. サイト本体の移行（three@0.185）
 - [ ] `map/out_white/` の 9 GLB + `manifest.json` を `public/map/` にコピー
