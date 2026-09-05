@@ -73,7 +73,7 @@ publish ブランチには以下のファイルのみ存在します:
 
 全ページ共通の背景に、2 種類の装飾エフェクトを切り替え可能に表示しています（コンテンツより奥の固定レイヤー）。
 
-- **背景の切替**: 右サイドバー（モバイルはドロワー）の下部に「背景」セクションを配置し、「波」と「宇宙船」の 2 ボタンで切替。選択は `localStorage`（`cresome.bgMode`）に保存されリロード後も維持される。デフォルトは「波」。
+- **背景の切替**: 右サイドバー（モバイルはドロワー）の下部に「背景」セクションを配置し、「波」/「宇宙船」/「地図(beta)」の 3 ボタンで切替（「地図」ボタンは 2 行ラベル: 「地図」＋「(beta)」）。選択は `localStorage`（`cresome.bgMode`）に保存されリロード後も維持される。デフォルトは「波」。
 - **波モード（既定）**: `src/components/WaveBackground.jsx`
   - **描画方式**: Canvas 2D で XZ 平面の点グリッドをサイン波 4 種の合成で変形し、透視投影で 3D の点状波形として描画。背景は透明、点は薄い灰色で、波の山ほど濃く大きく・谷は淡く表示する。
 - **宇宙船モード**: `src/components/SpaceWarsBackground.jsx`
@@ -601,3 +601,10 @@ scripts\start_viewer.bat
   4. `routes.json` の 10 経路 station 名と `ROUTE_NAMES` の完全一致を確認
 - **維持事項**: 旧 `src/data/otsuka-map.json`・`scripts/generate-map-data.mjs` は保持（import 削除のみ）。
   `publish` worktree は変更せず（公開は `npm run deploy` で別途実施）
+
+### 2026-09-05: サイドバーの「地図」ボタンに「(beta)」を付与
+
+- **要望**: サイドバー（およびモバイルドロワー）の背景切替「地図」ボタンを「地図<br>(beta)」に修正（ボタンラベルが 2 行になる）
+- **実装**: `src/components/BgSwitcher.jsx` の地図ボタンに `<br />` + 「(beta)」を追加（波 / 宇宙船の 2 ボタンと並ぶ 3 ボタン構成のままで、地図のみ 2 行ラベル）。CSS 変更なし（`flex` 行の高さが 2 行分に自動的に伸びる）
+- **検証（実施済み）**: `npm run build` 成功（vite build、エラーなし）
+- **公開**: main への push に加え `npm run deploy` で publish worktree へ同期・プッシュ済み

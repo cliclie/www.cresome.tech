@@ -29,30 +29,36 @@
 - [x] `map/README.md` の "De sription" typo 修正 + 構成・`out_white/` の構造説明追記
 - [x] パイプライン実行で出物検証（GLB + routes、`verify_glb.py` / `verify_changes.py` / `viewer/` で目視）
 
-## 2. サイト本体の移行（three@0.185）
-- [ ] `map/out_white/` の 9 GLB + `manifest.json` を `public/map/` にコピー
-- [ ] `src/components/MapBackground.jsx` 書き換え:
+## 2. サイト本体の移行（three@0.185）— 2026-09-05 完了（`7ece525`〜`2929fc9`）
+- [x] `map/out_white/` の 9 GLB + `manifest.json` + `routes.json` を `public/map/` にコピー
+- [x] `src/components/MapBackground.jsx` 書き換え:
       - `../data/otsuka-map.json` の import を削除
-      - `GLTFLoader`（`three/examples/jsm/loaders/GLTFLoader.js`）で 9 レイヤーを読み込み
+      - `GLTFLoader`（`three/addons/loaders/GLTFLoader.js`）で 9 レイヤーを読み込み
       - ENU → Y-up 変換: `world` グループに `rotation.x = -Math.PI/2`（`map/viewer/viewer.js` と同方式）
-      - ライティング追加（HemisphereLight + DirectionalLight、GLB は PBR マテリアルで必須）
-      - 地盤標高: `elevationAt()` / `elevationSmooth()` を terrain GLB へのレイキャストに置換（1 フレーム 1 回）
-      - ルート / 駅 / クリサム位置は `map/manifest.json` から取得
-      - **維持**: 追従カメラ（歩行 1.6m / 俯瞰 350m 軌道）、ユーザーカメラオフセット（yaw/pitch/zoom/pan）、
+      - 描画: GLB に頂点色が焼き込まれているため**光源不要** — `MeshBasicMaterial`（頂点色・フラット色）で描画。
+        計画時点の「PBR + ライティング追加」は不要になった
+      - 地盤標高: ルート・駅・クリサム位置は `routes.json` / `manifest.json` に z（標高）が既収録のため、
+        レイキャスト不要。歩行視点の眼高もルートデータに既反映（z = 地盤 + 0.06 + 1.6）
+      - roads.glb は LINES プリミティブ → `LineBasicMaterial`（頂点色）で描画
+      - ルート: 丸め曲線（`buildRoundedCurve`）で TubeGeometry 化。ドット・ヘディングは
+        曲線上の弧長補間（`getPointAt` / `getTangentAt`）
+      - **維持**: 追従カメラ（歩行 / 俯瞰 350m 軌道）、ユーザーカメラオフセット（yaw/pitch/zoom/pan）、
         ポインタ / キーボード操作 + UI ゲーティング、再生 / 中断 / リセット（`resetToken`）、
         フレームレート非依存の指数平滑 + 最短角補間、タブ非表示時描画停止
-- [ ] `src/components/MapControls.jsx`: 駅選択を 7 駅に変更
-      （大塚 = 山手線 / 東池袋・護国寺 = 有楽町線 / 新大塚 = 丸ノ内線 / 大塚駅前・向原・東池袋四丁目 = 都電荒川線。
-       東池袋駅の路線名を「丸ノ内線」→「有楽町線」に修正）
-- [ ] `src/App.jsx`: `defaultMapConfig.stationId` は `'otsuka'` のまま（旧 localStorage の 3 駅 ID は継続有効）
-- [ ] `src/index.css`: 必要なら 7 駅ボタンの表示調整
+- [x] `src/components/MapControls.jsx`: 始点選択を路線グループ別（7 駅 / 10 始点）にグループ表示
+      （大塚 = 山手線 / 東池袋・護国寺 = 有楽町線 / 新大塚 1番・2番出口 = 丸ノ内線 /
+       大塚駅前・向原（早稲田側・三ノ輪側）・東池袋四丁目（早稲田側・三ノ輪側）= 都電荒川線。
+       東池袋駅の路線名を「丸ノ内線」→「有楽町線」に修正済み）
+- [x] `src/App.jsx`: `defaultMapConfig.stationId` は `'otsuka'` のまま。旧 localStorage の stationId は
+      10 始点 ID で妥当性検証し、無効なら `'otsuka'` へフォールバック
+- [x] `src/index.css`: 路線グループヘッダ・始点ボタンのラップ表示用スタイル追加
 
-## 3. ドキュメント
-- [ ] メイン `README.md` の「地図モード」セクションを GLB 方式（データソース / レイヤー / 座標系 / ルート）に改訂 + 作業記録追記
+## 3. ドキュメント — 2026-09-05 完了
+- [x] メイン `README.md` の「地図モード」セクションを GLB 方式（データソース / レイヤー / 座標系 / ルート）に改訂 + 作業記録追記
 
-## 4. 検証・コミット・デプロイ
-- [ ] `npx vite build` が成功すること
-- [ ] dev サーバーで目視: GLB 各レイヤー描画（暗くなるならライティング不足）、7 ルートのアニメーション、
-      再生 / 中断 / リセット、マウス / キーボードカメラ操作、他背景モードへの影響なし
-- [ ] main にコミット（ローカル）
-- [ ] publish worktree を dist/ + CNAME で同期しコミット（ローカル。公開は `npm run deploy` で別途実施）
+## 4. 検証・コミット・デプロイ — 2026-09-05 完了
+- [x] `npx vite build` が成功すること
+- [x] dev サーバーで検証: GLB 全アセット配信（200）/ 9 GLB を Node の `GLTFLoader` で全解析成功 /
+      `routes.json` の station 名と `ROUTE_NAMES` の一致確認（ブラウザでの目視は実施者のみ）
+- [x] main にコミット・プッシュ（`7ece525` 以降）
+- [x] publish worktree を dist/ + CNAME で同期しコミット・プッシュ（`npm run deploy`）
