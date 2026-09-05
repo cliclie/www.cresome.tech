@@ -6,7 +6,7 @@
   roads.glb      道路面（灰色フラット）
   parks.glb      公園（OSM leisure=park、緑フラット）
   water.glb      水部（青フラット）
-  stations.glb   駅マーカー×7（路線カラー）
+  stations.glb   開始点マーカー×10（路線カラー、README準拠の降り口）
   lines.glb      路線チューブ×4（JR山手/有楽町/丸ノ内/都電荒川）
   cresome.glb    クリサム社マーカー
   manifest.json  ビュワー用メタ情報（駅・路線・出典など）
@@ -29,6 +29,8 @@ from lxml import etree
 from pyproj import Transformer
 from shapely.geometry import LineString, MultiPolygon, Point, Polygon, box
 from shapely.ops import unary_union
+from trimesh.path import Path3D
+from trimesh.path.entities import Line
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import config  # noqa: E402
@@ -37,6 +39,7 @@ import terrain as terrain_mod  # noqa: E402
 ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = ROOT / config.OUT_DIR
 DATA = ROOT / "data"
+IS_WHITE = False  # apply_palette("white") で True（線パターン生成の可否）
 
 # ---------------------------------------------------------------- 座標変換
 M_PER_DEG = 110_574.0  # 1度 ≒ 110.574km（赤道基準、この緯度では十分）
@@ -315,12 +318,195 @@ def flat_meshes(polys, z_offset: float, hexc: str, terrain):
     return meshes
 
 
-def building_meshes(buildings, terrain, color=None):
-    """建物 → エクストルードメッシュ（用途別色、地面標高に接地。color指定時は全メッシュ統一色）。"""
+def grid_following_meshes(polys, hexc: str, terrain) -> list:
+    """ポリゴン群 → 地形グリッド上に構築したメッシュ（Option B: グリッド追従）。
+
+    各地形グリッドセルの2つの三角形（build_mesh と同一の対角分割）とポリゴンの
+    交差を計算し、交差ポリゴンを三角分割する。z は地形三角形の平面方程式から
+    補間するため、地形メッシュと完全に一致する（突き抜けなし）。
+    """
+    h = terrain.h
+    cell = terrain.cell
+    min_x, min_y = terrain.min_x, terrain.min_y
+    nx, ny = terrain.nx, terrain.ny
+    meshes = []
+    for p in polys:
+        parts = list(p.geoms) if isinstance(p, MultiPolygon) else [p]
+        for part in parts:
+            minx, miny, maxx, maxy = part.bounds
+            i0 = max(int(np.floor((minx - min_x) / cell)), 0)
+            i1 = min(int(np.ceil((maxx - min_x) / cell)), nx - 2)
+            j0 = max(int(np.floor((miny - min_y) / cell)), 0)
+            j1 = min(int(np.ceil((maxy - min_y) / cell)), ny - 2)
+            for j in range(j0, j1 + 1):
+                for i in range(i0, i1 + 1):
+                    x0, y0 = min_x + i * cell, min_y + j * cell
+                    x1, y1 = min_x + (i + 1) * cell, min_y + (j + 1) * cell
+                    z00, z10 = h[j, i], h[j, i + 1]
+                    z01, z11 = h[j + 1, i], h[j + 1, i + 1]
+                    tris = [
+                        ((x0, y0, z00), (x1, y0, z10), (x1, y1, z11)),
+                        ((x0, y0, z00), (x1, y1, z11), (x0, y1, z01)),
+                    ]
+                    for tri in tris:
+                        tri2d = Polygon([(tri[0][0], tri[0][1]), (tri[1][0], tri[1][1]), (tri[2][0], tri[2][1])])
+                        inter = tri2d.intersection(part)
+                        if inter.is_empty or inter.area < 1e-6:
+                            continue
+                        inter_polys = list(inter.geoms) if inter.geom_type == "MultiPolygon" else [inter]
+                        for ip in inter_polys:
+                            if ip.area < 1e-6:
+                                continue
+                            m = _to_trimesh(trimesh.creation.triangulate_polygon(ip, engine="earcut"))
+                            if m is None or len(m.vertices) == 0:
+                                continue
+                            m.vertices[:, 2] = _tri_plane_z(m.vertices[:, 0], m.vertices[:, 1], tri)
+                            paint(m, hexc)
+                            meshes.append(m)
+    return meshes
+
+
+def _tri_plane_z(x, y, tri):
+    """三角形 tri の平面上の (x, y) の z を計算（平面方程式）。"""
+    (x1, y1, z1), (x2, y2, z2), (x3, y3, z3) = tri
+    nx = (y2 - y1) * (z3 - z1) - (z2 - z1) * (y3 - y1)
+    ny = (z2 - z1) * (x3 - x1) - (x2 - x1) * (z3 - z1)
+    nz = (x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1)
+    if abs(nz) < 1e-12:
+        return np.full_like(x, z1)
+    return z1 - (nx * (x - x1) + ny * (y - y1)) / nz
+
+
+# ---------------------------------------------------------------- 線パターン（白地図風）
+def _line_path(parts, hexc):
+    """(x,y,z) 点列のリスト → 単一 Path3D（点列ごとに Line エンティティ、同色）。
+
+    parts が空なら None。process=False で重複頂点マージをスキップ
+    （GLB 出力時に discrete() が必ず頂点を再展開するためファイルサイズは同じ）。
+    """
+    verts = []
+    entities = []
+    offset = 0
+    for pts in parts:
+        pts = np.asarray(pts, dtype=float)
+        if len(pts) < 2:
+            continue
+        verts.append(pts)
+        entities.append(Line(points=list(range(offset, offset + len(pts)))))
+        offset += len(pts)
+    if not entities:
+        return None
+    colors = np.tile(np.array([hex_to_rgba(hexc)], dtype=np.uint8), (len(entities), 1))
+    return Path3D(entities=entities, vertices=np.vstack(verts), colors=colors, process=False)
+
+
+def _boundary_lines(geom):
+    """LineString / MultiLineString / GeometryCollection → LineString のリスト。"""
+    if geom is None or geom.is_empty:
+        return []
+    if geom.geom_type == "LineString":
+        return [geom]
+    if geom.geom_type in ("MultiLineString", "GeometryCollection"):
+        return [g for g in geom.geoms if g.geom_type == "LineString"]
+    return []
+
+
+def building_outline_paths(buildings, terrain, hexc):
+    """建物の屋根外周 + 底面外周 + 角の垂直線 → Path3D（白地図風の線画）。"""
+    parts = []
+    for b in buildings:
+        ring = b["rings"]
+        if len(ring) < 4:
+            continue
+        rx = np.array([p[0] for p in ring])
+        ry = np.array([p[1] for p in ring])
+        z_ground = terrain.height(rx, ry)  # 各頂点の地面標高
+        z_base = float(z_ground.min())
+        z_roof = z_base + b["height"]  # 屋根面（塗り潰しメッシュとぴったりに一致）
+        # 屋根外周
+        parts.append(np.column_stack([rx, ry, np.full(len(ring), z_roof)]))
+        # 底面外周（地面に接地。z-fighting はビュワー側の polygonOffset で回避）
+        parts.append(np.column_stack([rx, ry, z_ground]))
+        # 角の垂直線（底面外周から屋根外周まで）
+        for i in range(len(ring) - 1):  # ring は閉ループ（先頭==末尾）
+            x, y = ring[i]
+            parts.append(np.array([[x, y, z_ground[i]], [x, y, z_roof]]))
+    return _line_path(parts, hexc)
+
+
+def road_outline_paths(roads, terrain, hexc):
+    """道路面の union → 境界線 → Path3D（白地図風の道路境界）。"""
+    if not roads:
+        return None
+    boundary = unary_union(roads).boundary
+    # 高さは地形（DEM）標高のみ（常に地面に接地）。z-fighting はビュワー側の
+    # 地形 polygonOffset で回避する（README 参照）。
+    parts = []
+    for g in _boundary_lines(boundary):
+        coords = np.asarray(g.coords, dtype=float)
+        if len(coords) < 2:
+            continue
+        zs = terrain.height(coords[:, 0], coords[:, 1])
+        parts.append(np.column_stack([coords, zs]))
+    return _line_path(parts, hexc)
+
+
+def park_hatch_paths(parks, terrain, hexc, spacing=10.0):
+    """公園ポリゴン内の斜線ハッチ（45°: x+y=c 間隔 spacing m）→ Path3D。"""
+    parts = []
+    for p in parks:
+        polys = list(p.geoms) if isinstance(p, MultiPolygon) else [p]
+        for part in polys:
+            minx, miny, maxx, maxy = part.bounds
+            for c in np.arange(minx + miny, maxx + maxy, spacing):
+                x1 = max(minx, c - maxy)
+                x2 = min(maxx, c - miny)
+                if x2 - x1 < 1e-6:
+                    continue
+                inter = part.intersection(LineString([(x1, c - x1), (x2, c - x2)]))
+                for g in _boundary_lines(inter):
+                    coords = np.asarray(g.coords, dtype=float)
+                    if len(coords) < 2:
+                        continue
+                    zs = terrain.height(coords[:, 0], coords[:, 1])
+                    parts.append(np.column_stack([coords, zs]))
+    return _line_path(parts, hexc)
+
+
+def water_wave_paths(water, terrain, hexc, spacing=12.0, wavelength=16.0, amp=1.2):
+    """水部ポリゴン内の波線（東西方向の正弦波、1m 間隔サンプリング）→ Path3D。"""
+    parts = []
+    for p in water:
+        polys = list(p.geoms) if isinstance(p, MultiPolygon) else [p]
+        for part in polys:
+            minx, miny, maxx, maxy = part.bounds
+            for y0 in np.arange(miny, maxy, spacing):
+                xs = np.arange(minx, maxx, 1.0)
+                if len(xs) < 2:
+                    continue
+                ys = y0 + amp * np.sin(2.0 * np.pi * xs / wavelength)
+                inter = part.intersection(LineString(np.column_stack([xs, ys])))
+                for g in _boundary_lines(inter):
+                    coords = np.asarray(g.coords, dtype=float)
+                    if len(coords) < 2:
+                        continue
+                    zs = terrain.height(coords[:, 0], coords[:, 1])
+                    parts.append(np.column_stack([coords, zs]))
+    return _line_path(parts, hexc)
+
+
+def building_meshes(buildings, terrain, color=None, shrink=0.0):
+    """建物 → エクストルードメッシュ（用途別色、地面標高に接地。color指定時は全メッシュ統一色）。
+
+    shrink > 0 の場合、ポリゴンを水平方向に shrink (m) 内側に縮小する
+    （白地図で輪郭線と Z-fighting しないよう輪郭線がメッシュ外側に来るようにする）。
+    """
     meshes = []
     n_skip = 0
     for b in buildings:
         poly = Polygon(b["rings"], b["holes"]) if b["holes"] else Polygon(b["rings"])
+        if shrink > 0:
+            poly = poly.buffer(-shrink, join_style=2)  # mitre: 角を落として縮小
         if not poly.is_valid:
             n_skip += 1
             continue
@@ -332,10 +518,17 @@ def building_meshes(buildings, terrain, color=None):
         if m is None or len(m.vertices) == 0:
             n_skip += 1
             continue
-        # 足跡外周の最低標高を基準に接地（斜面では浮き上がらない）
+        # 底面を地形に追従させ接地（斜面で埋没しない）。屋根面は平面（最低標高+height）に保つ
         rx = np.array([p[0] for p in b["rings"]])
         ry = np.array([p[1] for p in b["rings"]])
-        m.apply_translation([0.0, 0.0, float(terrain.height(rx, ry).min())])
+        z_base = float(terrain.height(rx, ry).min())
+        v = m.vertices
+        h = b["height"]
+        bottom_mask = v[:, 2] < h / 2
+        top_mask = v[:, 2] >= h / 2
+        v[bottom_mask, 2] = terrain.height(v[bottom_mask, 0], v[bottom_mask, 1])
+        v[top_mask, 2] = z_base + h
+        m.vertices = v
         if color is None:
             usage = b.get("usage")
             color = config.USAGE_COLORS.get(usage, ("?", config.DEFAULT_BUILDING_COLOR))[1]
@@ -385,20 +578,12 @@ def station_marker(name: str, x: float, y: float, hexc: str) -> trimesh.Scene:
 
 
 def cresome_marker(x: float, y: float, z0: float = 0.0) -> trimesh.Trimesh:
-    """クリサム社マーカー: 高めのポール + コーンヘッド（z0 で地形に接地）。"""
-    h = 14.0
-    pole = trimesh.creation.cylinder(radius=0.7, height=h, sections=16)
-    pole.apply_translation([x, y, z0 + h / 2])
-    paint(pole, config.CRESOME_COLOR)
-    cone = trimesh.creation.cone(radius=2.4, height=5.0, sections=24)
-    cone.apply_translation([x, y, z0 + h + 2.5])
-    paint(cone, config.CRESOME_COLOR)
-    base = trimesh.creation.cylinder(radius=3.5, height=0.25, sections=24)
+    """クリサム社マーカー: 注釈図方式 — 地点を示す基部円盤のみ（z0 で地形に接地）。"""
+    base = trimesh.creation.cylinder(radius=0.5, height=0.25, sections=24)
     base.apply_translation([x, y, z0 + 0.12])
-    paint(base, "#FFFFFF")
-    merged = trimesh.util.concatenate([base, pole, cone])
-    merged.name = "cresome_hq"
-    return merged
+    paint(base, config.CRESOME_COLOR)
+    base.name = "cresome_hq"
+    return base
 
 
 def parse_osm_parks(cb: box):
@@ -486,62 +671,23 @@ def _clip_linestring(pts):
 
 
 def parse_stations():
-    """PLATEAU station.geojson（両区）から config.STATIONS の7駅を抽出。
+    """config.START_POINTS の10開始点を当地座標に変換して返す。
 
-    不足分は OSM tram_stops.json で補完する。
+    駅マーカーの代わりに開始点（降り口）を表示する。
     戻り値: list of dict(label, line_key, color, x, y, elevation)
     """
-    found = {}
-    for ward in ("bunkyo", "toshima"):
-        files = sorted((DATA / "plateau" / "related" / ward).glob("*station*.geojson"))
-        for f in files:
-            data = json.loads(f.read_text(encoding="utf-8"))
-            for feat in data.get("features", []):
-                props = feat.get("properties", {})
-                key = (props.get("路線名"), props.get("駅名"))
-                if key not in config.STATIONS:
-                    continue
-                lon, lat = feat["geometry"]["coordinates"][:2]
-                x, y = jgd_to_local(lat, lon)
-                found[key] = {
-                    "label": config.STATIONS[key]["label"],
-                    "line_key": config.STATIONS[key]["line"],
-                    "color": config.LINES[key[0]]["color"],
-                    "x": float(x),
-                    "y": float(y),
-                    "elevation": props.get("高さ", 0),
-                }
-    if len(found) < len(config.STATIONS):
-        missing = set(config.STATIONS) - set(found)
-        print(f"stations: PLATEAUで不足 {missing} → OSM tram_stops.json で補完")
-        osm_path = DATA / "osm" / "tram_stops.json"
-        if osm_path.exists():
-            data = json.loads(osm_path.read_text(encoding="utf-8"))
-            for key in missing:
-                st_name = key[1].replace("駅", "")
-                best = None
-                for el in data.get("elements", []):
-                    tags = el.get("tags", {})
-                    if tags.get("name") != st_name:
-                        continue
-                    pt = tags.get("public_transport")
-                    if pt not in ("station", "stop_position"):
-                        continue
-                    x, y = wgs_to_local(el["lat"], el["lon"])
-                    score = 0 if pt == "station" else 1
-                    if best is None or score < best[0]:
-                        best = (score, float(x), float(y))
-                if best:
-                    found[key] = {
-                        "label": config.STATIONS[key]["label"],
-                        "line_key": config.STATIONS[key]["line"],
-                        "color": config.LINES[key[0]]["color"],
-                        "x": best[1],
-                        "y": best[2],
-                        "elevation": 0,
-                    }
-    out = [found[k] for k in config.STATIONS if k in found]
-    print(f"stations: {len(out)}/{len(config.STATIONS)}")
+    out = []
+    for sp in config.START_POINTS:
+        x, y = wgs_to_local(sp["lat"], sp["lon"])
+        out.append({
+            "label": sp["name"],
+            "line_key": sp["line"],
+            "color": config.LINE_COLOR_BY_LABEL[sp["line"]],
+            "x": float(x),
+            "y": float(y),
+            "elevation": 0,
+        })
+    print(f"stations: {len(out)} 開始点")
     return out
 
 
@@ -626,6 +772,8 @@ def export_glb(name: str, meshes) -> Path | None:
 
     リスト渡しの場合は頂点色を保ったまま1メッシュにマージし、
     ビュワー側のdraw call数を削減する。
+    Trimesh（面）と Path3D（線パターン）が混在する場合はそれぞれ
+    個別にマージして1シーンに格納する（GLBでは GL_TRIANGLES / GL_LINES 別プリミティブ）。
     """
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     path = OUT_DIR / f"{name}.glb"
@@ -635,9 +783,20 @@ def export_glb(name: str, meshes) -> Path | None:
         meshes = list(meshes or [])
         if not meshes:
             return None
-        merged = trimesh.util.concatenate(meshes)
-        merged.name = name
-        scene = trimesh.Scene(merged)
+        tris = [m for m in meshes if isinstance(m, trimesh.Trimesh)]
+        paths = [m for m in meshes if isinstance(m, Path3D)]
+        geoms = []
+        if tris:
+            merged = trimesh.util.concatenate(tris)
+            merged.name = name
+            geoms.append(merged)
+        if paths:
+            merged_p = trimesh.util.concatenate(paths)
+            merged_p.name = f"{name}_lines"
+            geoms.append(merged_p)
+        if not geoms:
+            return None
+        scene = trimesh.Scene(geoms)
     if not scene.geometry:
         return None
     gltf = scene.export(file_type="glb")
@@ -668,7 +827,7 @@ def write_manifest(stations, lines, stats, terr, cz, cresome_bldg=None):
             {"id": "parks", "file": "parks.glb", "label": "公園"},
             {"id": "water", "file": "water.glb", "label": "水部"},
             {"id": "lines", "file": "lines.glb", "label": "路線"},
-            {"id": "stations", "file": "stations.glb", "label": "駅"},
+            {"id": "stations", "file": "stations.glb", "label": "開始点"},
             {"id": "cresome", "file": "cresome.glb", "label": "クリサム株式会社"},
         ],
         "stations": [
@@ -708,10 +867,13 @@ def write_manifest(stations, lines, stats, terr, cz, cresome_bldg=None):
 # ---------------------------------------------------------------- main
 def apply_palette(name: str) -> None:
     """カラーパレットを適用（configをミューテート。色は全て呼び出し時に参照される）。"""
+    global IS_WHITE
+    IS_WHITE = False
     if name == "default":
         return
     if name != "white":
         raise SystemExit(f"unknown palette: {name} (available: default, white)")
+    IS_WHITE = True
     p = config.WHITE_PALETTE
     config.USAGE_COLORS = {k: (v[0], p["BUILDING_GRAY"]) for k, v in config.USAGE_COLORS.items()}
     config.DEFAULT_BUILDING_COLOR = p["BUILDING_GRAY"]
@@ -774,12 +936,16 @@ def main():
     print("== mesh ==")
     meshes_buildings = building_meshes(buildings, terr) if buildings else []
     meshes_cresome_bldg = (
-        building_meshes(cresome_buildings, terr, color=config.CRESOME_BUILDING_COLOR)
+        # 白地図: 輪郭線と Z-fighting 回避のため塗り潰しを 1cm 内側に縮小（輪郭線が外側に来る）
+        building_meshes(cresome_buildings, terr, color=config.CRESOME_BUILDING_COLOR,
+                        shrink=0.01 if IS_WHITE else 0.0)
         if cresome_buildings else []
     )
-    meshes_roads = flat_meshes(roads, config.Z_ROAD, config.ROAD_COLOR, terr)
-    meshes_parks = flat_meshes(parks, config.Z_PARK, config.PARK_COLOR, terr)
-    meshes_water = flat_meshes(water, config.Z_WATER, config.WATER_COLOR, terr)
+    # 道路塗りつぶしはデフォルトのみ（白地図は境界線のみで表現）
+    meshes_roads = [] if IS_WHITE else flat_meshes(roads, config.Z_ROAD, config.ROAD_COLOR, terr)
+    # 公園・水部は地形グリッド追従メッシュ（Option B: 地形三角形と同一分割で突き抜けなし）
+    meshes_parks = grid_following_meshes(parks, config.PARK_COLOR, terr)
+    meshes_water = grid_following_meshes(water, config.WATER_COLOR, terr)
 
     meshes_lines: list[trimesh.Trimesh] = []
     for l in lines:
@@ -788,23 +954,16 @@ def main():
             if m is not None:
                 meshes_lines.append(m)
 
+    # 駅マーカー: 注釈図方式 — ピン（リング/ポール/頭部球）は廃止し、
+    # 地点を示す小さな基部円盤のみ残す（ラベルからのリーダー線がここに接続）
     scene_stations = trimesh.Scene()
     for s in stations:
-        h = config.STATION_MARKER_HEIGHT
         z0 = float(terr.height(s["x"], s["y"]))
         s["z"] = z0
-        ring = trimesh.creation.cylinder(radius=3.0, height=0.2, sections=24)
-        ring.apply_translation([s["x"], s["y"], z0 + 0.1])
-        paint(ring, "#FFFFFF")
-        pole = trimesh.creation.cylinder(radius=0.5, height=h, sections=16)
-        pole.apply_translation([s["x"], s["y"], z0 + h / 2 + 0.2])
-        paint(pole, s["color"])
-        head = trimesh.creation.icosphere(subdivisions=2, radius=1.8)
-        head.apply_translation([s["x"], s["y"], z0 + h + 1.6])
-        paint(head, s["color"])
-        scene_stations.add_geometry(ring, node_name=f"{s['label']}_ring")
-        scene_stations.add_geometry(pole, node_name=f"{s['label']}_pole")
-        scene_stations.add_geometry(head, node_name=f"{s['label']}_head")
+        base = trimesh.creation.cylinder(radius=0.5, height=0.2, sections=24)
+        base.apply_translation([s["x"], s["y"], z0 + 0.1])
+        paint(base, s["color"])
+        scene_stations.add_geometry(base, node_name=f"{s['label']}_base")
 
     cz = float(terr.height(float(cx), float(cy)))
     m_cresome = cresome_marker(float(cx), float(cy), cz)
@@ -819,6 +978,25 @@ def main():
         "stations": len(stations),
         "lines": len(lines),
     }
+    # 線パターン（白地図のみ）: 建物アウトライン / 道路境界 / 公園ハッチ / 水波線
+    if IS_WHITE:
+        print("== white map lines ==")
+        p = config.WHITE_PALETTE
+        pl = building_outline_paths(buildings, terr, p["OUTLINE_COLOR"])
+        if pl is not None:
+            meshes_buildings.append(pl)
+        pl = building_outline_paths(cresome_buildings, terr, p["OUTLINE_COLOR"])
+        if pl is not None:
+            meshes_cresome_bldg.append(pl)
+        pl = road_outline_paths(roads, terr, p["OUTLINE_COLOR"])
+        if pl is not None:
+            meshes_roads.append(pl)
+        pl = park_hatch_paths(parks, terr, p["HATCH_COLOR"])
+        if pl is not None:
+            meshes_parks.append(pl)
+        pl = water_wave_paths(water, terr, p["WAVE_COLOR"])
+        if pl is not None:
+            meshes_water.append(pl)
     export_glb("terrain", [terr.build_mesh()])
     if meshes_buildings:
         export_glb("buildings", meshes_buildings)

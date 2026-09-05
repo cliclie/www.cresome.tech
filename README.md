@@ -105,6 +105,93 @@ publish ブランチには以下のファイルのみ存在します:
   - タブ非表示時は描画停止（`visibilitychange` で復帰時に再開）
   - 新規依存ライブラリなし（Canvas 2D + 原生 JS の `requestAnimationFrame` ループ）
 
+## map/ — 3D マップデータ生成ワークスペース
+
+クリサム株式会社へ案内するための 3D マップデータを生成する独立ワークスペースです。
+PLATEAU 都市モデル（CityGML）と OpenStreetMap（Overpass API）の実データから、
+three.js で読み込める GLB レイヤー群と最短経路を生成します。
+
+> **詳細な使い方・構成・検証手順は [`map/README.md`](./map/README.md) を参照してください。**
+> ここでは親リポジトリからの入り口として概要を記載します。
+
+### 概要
+
+- **目的**: クリサム社屋（東京都文京区大塚 6-22-2）へ最寄り 10 起点（駅出口・停留所）から
+  歩いてくる経路を 3D で可視化し、コーポレートサイトの地図モードで公開する。
+- **データソース**:
+  - PLATEAU 都市モデル（国土交通省）: 文京区・豊島区 2025 年度版 CityGML（建物・道路・水部・DEM）
+  - OpenStreetMap（Overpass API）: 都電荒川線・停留所・公園・highway ways（道路ネットワーク）
+  - クリサム社屋座標: Google Maps（クライアント提供）
+- **座標系**: 当地平面座標（ENU、単位 m）。原点は `map/src/config.py` の CENTER
+  （WGS84 35.721N / 139.7220E）、X=東 / Y=北 / Z=上。three.js 読み込み時は
+  `group.rotation.x = -Math.PI/2` で Y-up 変換。
+
+### 成果物（`map/out/` と `map/out_white/`）
+
+| ファイル | 内容 |
+|---|---|
+| `terrain.glb` | 地面（PLATEAU DEM/TINRelief、標高 0.2〜34.2m） |
+| `buildings.glb` | 建物（LOD1 エクストルード、用途別色、頂点色・単一メッシュにマージ済み） |
+| `cresome_building.glb` | クリサム社屋の建物 1 棟のみ（外部でこの 1 棟だけ色変更可能） |
+| `roads.glb` | 道路面（灰色、地面標高に沿う） |
+| `parks.glb` | 公園（OSM leisure=park、緑） |
+| `water.glb` | 水部（青） |
+| `lines.glb` | 路線チューブ×4（JR 山手 / 有楽町 / 丸ノ内 / 都電荒川、公式ラインカラー） |
+| `stations.glb` | 開始点マーカー×10（路線カラーのポール+球。駅出口・停留所） |
+| `cresome.glb` | クリサム社マーカー（赤） |
+| `manifest.json` | ビュワー用メタ情報（レイヤー・開始点位置・路線色・出典） |
+| `routes.json` | 10 起点→クリサムの最短経路（ENU ポリライン、Douglas-Peucker 簡略化済み） |
+
+- `out/`: 通常カラーパレット
+- `out_white/`: 白地図風パレット（建物 #CFCFCF / 道路 白 / 路線 #5A5A50 / クリサム #E94B3A）
+  — サイトの地図モード用に用意
+
+### 最短経路の生成（`map/src/routes.py`）
+
+10 起点からクリサム社屋までの最短経路を、OSM の道路ネットワーク上で Dijkstra 法により計算します。
+
+1. **道路グラフ構築**: `data/osm/highways.json` の highway ways を ENU 座標に変換し、
+   共有端点 = ノード、セグメント距離 = 重みの無向グラフを構築。
+2. **起点スナップ（複数候補評価）**: 各起点に対し、`SNAP_RADIUS`（25 m）以内のグラフノードを
+   すべて候補とし、「起点→ノード距離 + ノード→クリサム距離」が最小となるノードを選択。
+   単一最寄ノードスナップだと歩道（footway）の枝に張り付いて迂回・折り返しが発生する問題を
+   回避するため、主路方向へのスナップを優先する。
+3. **Dijkstra**: クリサム側ノードから 1 回の Dijkstra で全ノードの最短距離を求め、
+   各起点スナップノードからクリサムへの経路を復元。
+4. **座標列の組み立て**: 実際の起点座標をスナップ済みグラフ経路の先頭に付加し、
+   Douglas-Peucker 簡略化（epsilon = 2 m）を適用して ENU ポリラインとして出力。
+
+### セットアップと実行
+
+```bat
+cd map
+pip install -r requirements.txt
+
+:: データ取得（初回のみ。数 GB 級のため時間がかかります）
+python src/extract_plateau.py        :: PLATEAU CityGML
+python src/fetch_osm.py              :: OSM: 都電荒川線・停留所・公園・鉄道駅
+python scripts\download_highways.py  :: OSM highway ways（最短経路計算用）
+
+:: GLB 生成（約 30 秒）
+python src/pipeline.py
+
+:: 最短経路生成（10 起点 → クリサム）
+python src/routes.py
+
+:: ビュワー起動 → http://localhost:8000/viewer/index.html
+scripts\start_viewer.bat
+```
+
+- 白地図風セットの生成: `python src/pipeline.py --palette white --out out_white`
+- 検証: `python src/verify_glb.py`（GLB 整合性）/ `python src/verify_changes.py`（白地図・地形突き抜け）
+- 生データ `map/data/`（約 5 GB）と成果物 `map/out/`・`map/out_white/`（各約 11 MB）は
+  コミット対象外（`map/.gitignore` 除外）。Synology Drive 同期（バックアップ）の対象として保持。
+
+### サイトへの移行（保留中）
+
+サイトの地図モードは現在 `src/data/otsuka-map.json`（合成データ）を使用しています。
+`map/` パイプラインの GLB データへの移行は未実施で、詳細な計画は [`TODO.md`](./TODO.md) に記載しています。
+
 ## 作業記録
 
 ### 2026-08-22: README.md の実装との整合性確認・修正
@@ -455,3 +542,31 @@ publish ブランチには以下のファイルのみ存在します:
   2. 生データ `map/data/`（約 5 GB: PLATEAU CityGML + OSM）と成果物 `map/out/`・`map/out_white/`（各約 11 MB: 9 レイヤー GLB + manifest.json）はコミット対象外（`map/.gitignore` 除外）。すべて Synology Drive 同期（バックアップ）の対象として保持
   3. サイトの地図モードは引き続き `src/data/otsuka-map.json`（合成データ: 建物 69 棟 / 路線 2 / ルート 3 経路）を使用 — GLB への移行は未実施
   4. 今後の移行作業の詳細は `TODO.md` に記載
+
+### 2026-09-05: map/ 最短経路の起点スナップ改善（ルートの徘徊・折り返し解消）
+
+- **要望**:
+  1. 10 起点のうち一部で、ルートが歩道（footway）の枝に張り付いて迂回・折り返しする（徘徊する）問題がある
+- **原因**:
+  - 起点スナップが「最寄ノード 1 点」のみを採用していたため、歩道の枝端ノードに張り付き、
+    主路へ戻るために一旦折り返す経路になっていた
+- **実装**（`map/src/routes.py`）:
+  1. `SNAP_RADIUS`（25 m）を導入し、起点付近のグラフノードを複数候補として評価
+  2. 「起点→ノード距離 + ノード→クリサム距離」が最小となるノードを選択する方式に変更
+     （クリサム側ノードから 1 回の Dijkstra で全ノードの最短距離を求め、候補を比較）
+  3. `RoadGraph.dijkstra_from()` / `RoadGraph.path_from()` を追加
+  4. 実際の起点座標をスナップ済みグラフ経路の先頭に付加（起点マーカーとルートの一致）
+  5. `path_from()` の順序問題を修正
+- **検証（実施済み）**:
+  1. `out/routes.json` と `out_white/routes.json` を再生成し、両者が一致することを確認（MD5 一致）
+  2. 全 10 経路をビュワーで目視確認: 問題ケースは主路方向にスナップし、クリサムへ向かって自然に接続
+  3. 起点スナップ距離の最大値は約 19.8 m（`SNAP_RADIUS = 25.0` に余裕あり）
+  4. 一部で「162 m の大きなセグメント」が警告されたが、Douglas-Peucker 簡略化による
+     直線道路の圧縮であり、実際のジャンプではないことを確認
+  5. 護国寺駅 1 番出口は直線距離に対する経路長比が高いが、道路ネットワークに沿った自然な経路であり問題なし
+- **ドキュメント整備**:
+  1. `map/README.md`: typo 修正（Desription→Description / treed.js→three.js）、
+     構成・セットアップ・成果物セクションに `routes.py` / `download_highways.py` / `routes.json` を追加、
+     「駅マーカー×7」→「開始点マーカー×10」に修正、「最短経路の生成」セクションを新設
+  2. 親 `README.md`: 「map/ — 3D マップデータ生成ワークスペース」セクションを新設
+     （概要・成果物・最短経路の生成・セットアップ・サイトへの移行の現状）
