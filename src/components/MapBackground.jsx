@@ -98,29 +98,12 @@ function buildRoundedCurve(pts, radius) {
 }
 
 // ============================================================
-// ルート長・パラメトリック位置取得
+// ルート長（速度換算用: m/s → 進捗 t/秒）
 // ============================================================
 function routeLength(pts3) {
   let len = 0;
   for (let i = 1; i < pts3.length; i++) len += pts3[i - 1].distanceTo(pts3[i]);
   return len;
-}
-
-function routePointAt(pts3, t) {
-  const total = routeLength(pts3);
-  let target = t * total;
-  for (let i = 1; i < pts3.length; i++) {
-    const seg = pts3[i - 1].distanceTo(pts3[i]);
-    if (target <= seg && seg > 0) {
-      const f = target / seg;
-      const pos = new THREE.Vector3().lerpVectors(pts3[i - 1], pts3[i], f);
-      const dir = new THREE.Vector3().subVectors(pts3[i], pts3[i - 1]).normalize();
-      return { pos, dir };
-    }
-    target -= seg;
-  }
-  const last = pts3[pts3.length - 1];
-  return { pos: last.clone(), dir: new THREE.Vector3(0, 0, 1) };
 }
 
 // ============================================================
@@ -177,6 +160,7 @@ export default function MapBackground({
     // ルート状態（init で routes.json を読み込み後に構築）
     const routesDataRef = { current: null };
     let routePts3 = [];  // three.js 座標の配列
+    let routeCurve = null; // ルートの丸め CurvePath（ドット位置・ヘディング用）
     let routeLen = 0;
     let routeLine = null;
     let movingDot = null;
@@ -203,8 +187,9 @@ export default function MapBackground({
 
     // フォーカスポイント・ヘディングをルート進捗 t に即座にスナップ（視点切替・ルート切替時）
     function snapToRoute(t) {
-      if (routePts3.length < 2) return;
-      const { pos, dir } = routePointAt(routePts3, t);
+      if (!routeCurve) return;
+      const pos = routeCurve.getPointAt(t);
+      const dir = routeCurve.getTangentAt(t);
       focus.x = pos.x; focus.y = pos.y; focus.z = pos.z;
       heading = Math.atan2(dir.x, dir.z);
     }
@@ -238,9 +223,9 @@ export default function MapBackground({
       routeLen = routeLength(routePts3);
 
       // ルートチューブ（viewer と同様の丸め曲線 + TubeGeometry）
-      const curve = buildRoundedCurve(routePts3, 1.0);
+      routeCurve = buildRoundedCurve(routePts3, 1.0);
       const segs = Math.max(Math.round(routeLen / 0.5), 64);
-      const tubeGeo = new THREE.TubeGeometry(curve, segs, ROUTE_TUBE_RADIUS, 8, false);
+      const tubeGeo = new THREE.TubeGeometry(routeCurve, segs, ROUTE_TUBE_RADIUS, 8, false);
       const tubeMat = new THREE.MeshBasicMaterial({
         color: ROUTE_COLOR, transparent: true, opacity: 0.8, depthWrite: false,
       });
@@ -353,14 +338,15 @@ export default function MapBackground({
       const dt = anim.lastTime ? (now - anim.lastTime) / 1000 : 0;
       anim.lastTime = now;
 
-      if (routePts3.length >= 2) {
+      if (routeCurve) {
         // ルート進捗（中断中は進行しない）
         if (cfg.playing && routeLen > 0) {
           anim.t += (cfg.speed * dt) / routeLen;
           if (anim.t > 1) anim.t -= 1;
         }
 
-        const { pos, dir } = routePointAt(routePts3, anim.t);
+        const pos = routeCurve.getPointAt(anim.t);
+        const dir = routeCurve.getTangentAt(anim.t);
         if (movingDot) movingDot.position.copy(pos);
 
         // キーボードによるカメラ操作
