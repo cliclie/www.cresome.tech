@@ -289,19 +289,28 @@ export default function MapBackground({
                     return;
                   }
                   gltf.scene.traverse((o) => {
-                    if (!o.isMesh) return;
-                    const old = o.material;
-                    const isTerrain = layer.id === 'terrain';
-                    const isLines = layer.id === 'lines'; // 路線チューブは半透明（地形が見える）
-                    o.material = new THREE.MeshBasicMaterial({
-                      vertexColors: !!o.geometry.attributes.color,
-                      polygonOffset: true,
-                      polygonOffsetFactor: isTerrain ? 1 : 0.5,
-                      polygonOffsetUnits: isTerrain ? 1 : 0.5,
-                      transparent: isLines,
-                      opacity: isLines ? 0.5 : 1.0,
-                    });
-                    old.dispose();
+                    const hasColor = !!o.geometry?.attributes.color;
+                    if (o.isMesh) {
+                      // 白地図風: 陰影・影なし — 頂点色のフラット色のみで描画
+                      // z-fighting 回避: 地形を最も奥に、その他の面を少し奥に polygonOffset で押し込む
+                      const old = o.material;
+                      const isTerrain = layer.id === 'terrain';
+                      const isRail = layer.id === 'lines'; // 路線チューブは半透明（地形が見える）
+                      o.material = new THREE.MeshBasicMaterial({
+                        vertexColors: hasColor,
+                        polygonOffset: true,
+                        polygonOffsetFactor: isTerrain ? 1 : 0.5,
+                        polygonOffsetUnits: isTerrain ? 1 : 0.5,
+                        transparent: isRail,
+                        opacity: isRail ? 0.5 : 1.0,
+                      });
+                      old.dispose();
+                    } else if (o.isLine) {
+                      // 道路ネットワーク（LINES プリミティブ）: 光源不要の非発光ライン
+                      const old = o.material;
+                      o.material = new THREE.LineBasicMaterial({ vertexColors: hasColor });
+                      old.dispose();
+                    }
                   });
                   world.add(gltf.scene);
                   resolve();
@@ -542,9 +551,9 @@ export default function MapBackground({
         movingDot.geometry.dispose();
         movingDot.material.dispose();
       }
-      // GLB レイヤーのリソース破棄
+      // GLB レイヤーのリソース破棄（メッシュ・ライン両方）
       world.traverse((o) => {
-        if (!o.isMesh) return;
+        if (!o.isMesh && !o.isLine) return;
         if (o.geometry) o.geometry.dispose();
         const m = o.material;
         if (Array.isArray(m)) m.forEach((mm) => mm.dispose());
