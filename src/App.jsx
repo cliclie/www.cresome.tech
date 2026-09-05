@@ -10,6 +10,7 @@ import Home from './pages/Home';
 import Business from './pages/Business';
 import Flow from './pages/Flow';
 import Company from './pages/Company';
+import { START_POINT_IDS } from './data/stationPoints';
 
 const PAGES = [
   { id: 'home', label: 'トップ', Component: Home },
@@ -41,8 +42,16 @@ export default function App() {
   // 地図モードの設定（駅・視点・向き・速度）
   const [mapConfig, setMapConfig] = useState(() => {
     try {
-      const saved = window.localStorage.getItem(MAP_CONFIG_KEY);
-      return saved ? { ...defaultMapConfig, ...JSON.parse(saved) } : defaultMapConfig;
+      const raw = window.localStorage.getItem(MAP_CONFIG_KEY);
+      const saved = raw ? JSON.parse(raw) : {};
+      return {
+        ...defaultMapConfig,
+        ...saved,
+        // 旧バージョンの駅 ID（例: 旧 shin_otsuka）は無効なのでデフォルトへ
+        stationId: START_POINT_IDS.includes(saved.stationId)
+          ? saved.stationId
+          : defaultMapConfig.stationId,
+      };
     } catch {
       return defaultMapConfig;
     }

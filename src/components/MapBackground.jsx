@@ -1,15 +1,17 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import mapData from '../data/otsuka-map.json';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 /**
- * 3D ワイヤーフレームマップ背景（Three.js）
+ * 3D 白地図背景（Three.js + GLB）
  *
- * 大塚エリアの道路（幅比例のフラットリボン）・鉄道・建物（面=背景色・輪郭=灰色の 3D ボックス）を描画し、
+ * map/out_white/ で生成した GLB レイヤー（地形・建物・道路・公園・水部・路線・駅・クリサム）を読み込み、
  * 選択した駅からクリサムまでのルートをアニメーション表示する。
  *
+ * 座標系: ENU（x=東, y=北, z=上）→ three.js Y-up 変換（world group rotation.x = -PI/2）
+ *
  * 視点モード:
- * - walking: 地上 1.6m の視点でルートを進行方向に追従
+ * - walking: ルート上の眼高（1.6m）で進行方向に追従
  * - aerial:  高所から斜めに俯瞰
  *
  * マウス / キーボードでのカメラ操作（両視点共通）:
@@ -21,281 +23,104 @@ import mapData from '../data/otsuka-map.json';
  */
 
 // ============================================================
-// 描画定数
+// 始点 ID → routes.json の station 名
 // ============================================================
-const C = {
-  terrain: { color: 0x1f2a54, opacity: 0.12 },
-  road:    { color: 0x1f2a54, opacity: 0.35 },
-  railway: { color: 0x1f2a54, opacity: 0.45 },
-  building:{ color: 0xffffff, edge: 0x8a8f98, opacity: 1.0 },
-  route:   { color: 0xef5b00, opacity: 0.80 },
-  station: { color: 0x1f2a54, opacity: 1.0 },
-  cresome: { color: 0xef5b00, opacity: 1.0 },
-  moving:  { color: 0xef5b00, opacity: 1.0 },
+const ROUTE_NAMES = {
+  otsuka: '大塚駅南口',
+  higashi_ikebukuro: '東池袋駅4番出口',
+  gokokuji: '護国寺駅1番出口',
+  shin_otsuka_1: '新大塚 丸ノ内線1番出口',
+  shin_otsuka_2: '新大塚 丸ノ内線2番出口',
+  otsuka_ekimae: '大塚駅前',
+  koubara_waseda: '向原 早稲田方面',
+  koubara_micorowa: '向原 三ノ輪方面',
+  hie_4chome_waseda: '東池袋四丁目 早稲田方面',
+  hie_4chome_micorowa: '東池袋四丁目 三ノ輪方面',
 };
 
-const EYE_H = 1.6;          // 歩行視点の高さ (m)
+// ============================================================
+// 描画定数
+// ============================================================
+const ROUTE_COLOR = 0xef5b00;
+const DOT_COLOR = 0xff9d4d;
+const ROUTE_TUBE_RADIUS = 0.3;
 const AERIAL_H = 350;       // 俯瞰視点の高さ (m)
 const AERIAL_TILT = 0.6;    // 俯瞰視点の前方オフセット倍率
 
 // ============================================================
-// ユーティリティ
+// 座標変換: ENU [x, y, z] → three.js Vector3
+// world group が rotation.x=-PI/2 になっているため three.js 座標: (x, z, -y)
 // ============================================================
-function routeLength(pts) {
-  let len = 0;
-  for (let i = 1; i < pts.length; i++) {
-    const dx = pts[i][0] - pts[i - 1][0];
-    const dz = pts[i][1] - pts[i - 1][1];
-    len += Math.hypot(dx, dz);
+function enuToV3(enu) {
+  return new THREE.Vector3(enu[0], enu[2], -enu[1]);
+}
+
+// ============================================================
+// 経路ポリラインのコーナーを滑らかに丸めた CurvePath（viewer.js 移植）
+// ============================================================
+function buildRoundedCurve(pts, radius) {
+  const curve = new THREE.CurvePath();
+  const n = pts.length;
+  if (n < 3) {
+    for (let i = 0; i < n - 1; i++) curve.add(new THREE.LineCurve3(pts[i], pts[i + 1]));
+    return curve;
   }
+  const inDir = new THREE.Vector3();
+  const outDir = new THREE.Vector3();
+  let prevEnd = pts[0];
+  for (let i = 1; i < n - 1; i++) {
+    const p1 = pts[i];
+    inDir.subVectors(p1, pts[i - 1]);
+    outDir.subVectors(pts[i + 1], p1);
+    const inLen = inDir.length();
+    const outLen = outDir.length();
+    if (inLen < 1e-6 || outLen < 1e-6) {
+      curve.add(new THREE.LineCurve3(prevEnd, p1));
+      prevEnd = p1;
+      continue;
+    }
+    inDir.divideScalar(inLen);
+    outDir.divideScalar(outLen);
+    if (inDir.dot(outDir) > 0.985) {
+      curve.add(new THREE.LineCurve3(prevEnd, p1));
+      prevEnd = p1;
+      continue;
+    }
+    const r = Math.min(radius, inLen * 0.5, outLen * 0.5);
+    const a = p1.clone().addScaledVector(inDir, -r);
+    const b = p1.clone().addScaledVector(outDir, r);
+    curve.add(new THREE.LineCurve3(prevEnd, a));
+    curve.add(new THREE.QuadraticBezierCurve3(a, p1, b));
+    prevEnd = b;
+  }
+  curve.add(new THREE.LineCurve3(prevEnd, pts[n - 1]));
+  return curve;
+}
+
+// ============================================================
+// ルート長・パラメトリック位置取得
+// ============================================================
+function routeLength(pts3) {
+  let len = 0;
+  for (let i = 1; i < pts3.length; i++) len += pts3[i - 1].distanceTo(pts3[i]);
   return len;
 }
 
-function routePointAt(pts, t) {
-  const total = routeLength(pts);
+function routePointAt(pts3, t) {
+  const total = routeLength(pts3);
   let target = t * total;
-  for (let i = 1; i < pts.length; i++) {
-    const dx = pts[i][0] - pts[i - 1][0];
-    const dz = pts[i][1] - pts[i - 1][1];
-    const seg = Math.hypot(dx, dz);
+  for (let i = 1; i < pts3.length; i++) {
+    const seg = pts3[i - 1].distanceTo(pts3[i]);
     if (target <= seg && seg > 0) {
       const f = target / seg;
-      return { x: pts[i - 1][0] + dx * f, z: pts[i - 1][1] + dz * f, dx, dz, seg };
+      const pos = new THREE.Vector3().lerpVectors(pts3[i - 1], pts3[i], f);
+      const dir = new THREE.Vector3().subVectors(pts3[i], pts3[i - 1]).normalize();
+      return { pos, dir };
     }
     target -= seg;
   }
-  const last = pts[pts.length - 1];
-  return { x: last[0], z: last[1], dx: 0, dz: 0, seg: 1 };
-}
-
-function elevationAt(x, z) {
-  const { elevations, gridSize, cellSize, area } = mapData.terrain;
-  const i = Math.round((x + area / 2) / cellSize);
-  const j = Math.round((z + area / 2) / cellSize);
-  if (i < 0 || i >= gridSize || j < 0 || j >= gridSize) return 0;
-  return elevations[j * gridSize + i];
-}
-
-// 地盤標高を双線形補間で滑らかに求める（歩行視点の段差ボビング防止）
-function elevationSmooth(x, z) {
-  const { elevations, gridSize, cellSize, area } = mapData.terrain;
-  const u = (x + area / 2) / cellSize;
-  const v = (z + area / 2) / cellSize;
-  const i = Math.floor(u);
-  const j = Math.floor(v);
-  if (i < 0 || i >= gridSize - 1 || j < 0 || j >= gridSize - 1) return elevationAt(x, z);
-  const tx = u - i;
-  const tz = v - j;
-  const e00 = elevations[j * gridSize + i];
-  const e10 = elevations[j * gridSize + i + 1];
-  const e01 = elevations[(j + 1) * gridSize + i];
-  const e11 = elevations[(j + 1) * gridSize + i + 1];
-  return e00 * (1 - tx) * (1 - tz) + e10 * tx * (1 - tz) + e01 * (1 - tx) * tz + e11 * tx * tz;
-}
-
-// ============================================================
-// シーン構築
-// ============================================================
-function buildTerrain() {
-  const { elevations, gridSize, cellSize } = mapData.terrain;
-  const positions = new Float32Array(gridSize * gridSize * 3);
-  for (let j = 0; j < gridSize; j++) {
-    for (let i = 0; i < gridSize; i++) {
-      const idx = (j * gridSize + i) * 3;
-      positions[idx]     = (i - gridSize / 2) * cellSize;
-      positions[idx + 1] = elevations[j * gridSize + i];
-      positions[idx + 2] = (j - gridSize / 2) * cellSize;
-    }
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-
-  const lines = [];
-  for (let j = 0; j < gridSize; j++) {
-    for (let i = 0; i < gridSize; i++) {
-      const a = j * gridSize + i;
-      if (i < gridSize - 1) lines.push(a, a + 1);
-      if (j < gridSize - 1) lines.push(a, a + gridSize);
-    }
-  }
-  geo.setIndex(lines);
-
-  const mat = new THREE.LineBasicMaterial({
-    color: C.terrain.color,
-    opacity: C.terrain.opacity,
-    transparent: true,
-  });
-  return new THREE.LineSegments(geo, mat);
-}
-
-// 地形高度に乗り（+ lift m）で描画するライン
-function buildGroundLine(pts, opts, lift) {
-  const positions = pts.map(([x, z]) => new THREE.Vector3(x, elevationAt(x, z) + lift, z));
-  const geo = new THREE.BufferGeometry().setFromPoints(positions);
-  const mat = new THREE.LineBasicMaterial({
-    color: opts.color,
-    opacity: opts.opacity,
-    transparent: true,
-  });
-  return new THREE.Line(geo, mat);
-}
-
-// 折れ線を step m 間隔に細分（交差点カットの精度確保のため）
-function subdivide(pts, step) {
-  const out = [pts[0]];
-  for (let i = 0; i < pts.length - 1; i++) {
-    const [x1, z1] = pts[i];
-    const [x2, z2] = pts[i + 1];
-    const d = Math.hypot(x2 - x1, z2 - z1);
-    const n = Math.max(1, Math.ceil(d / step));
-    for (let s = 1; s < n; s++) {
-      out.push([x1 + ((x2 - x1) * s) / n, z1 + ((z2 - z1) * s) / n]);
-    }
-    out.push(pts[i + 1]);
-  }
-  return out;
-}
-
-// 道路は道路幅を実寸（m）にしたフラットリボン（面）で描画する。
-// 主要道路は広く、狭い路地は細くなり、路面地図の幅比例感を表現する。
-// （WebGL のラインは 1px 固定のため、線幅ではなく面幅で表現する）
-// 交差点ゾーン内ではリボンを引かない。
-function buildRoads() {
-  const intersections = mapData.intersections || [];
-  const positions = [];
-  const indices = [];
-
-  for (const road of mapData.roads) {
-    const pts = subdivide(road.points, 10);
-    const off = road.width / 2;
-
-    // 各センターラインポイントの左右端ポイントと交差点ゾーン判定
-    const rows = pts.map(([x, z], i, arr) => {
-      let dx, dz;
-      if (i === 0) {
-        dx = arr[1][0] - x;
-        dz = arr[1][1] - z;
-      } else if (i === arr.length - 1) {
-        dx = x - arr[i - 1][0];
-        dz = z - arr[i - 1][1];
-      } else {
-        // 前後セグメント方向の平均法線方向へオフセット
-        const l1 = Math.hypot(x - arr[i - 1][0], z - arr[i - 1][1]) || 1;
-        const l2 = Math.hypot(arr[i + 1][0] - x, arr[i + 1][1] - z) || 1;
-        dx = (x - arr[i - 1][0]) / l1 + (arr[i + 1][0] - x) / l2;
-        dz = (z - arr[i - 1][1]) / l1 + (arr[i + 1][1] - z) / l2;
-      }
-      const len = Math.hypot(dx, dz) || 1;
-      const nx = -dz / len;
-      const nz = dx / len;
-      return {
-        left: [x + nx * off, z + nz * off],
-        right: [x - nx * off, z - nz * off],
-        inside: intersections.some(
-          (it) => Math.hypot(x - it.x, z - it.z) < it.radius,
-        ),
-      };
-    });
-
-    // 交差点ゾーン外の連続区間をクォッド列として出力
-    let runStart = null;
-    for (let i = 0; i <= rows.length; i++) {
-      const open = i < rows.length && !rows[i].inside;
-      if (open && runStart === null) runStart = i;
-      if (!open && runStart !== null) {
-        if (i - runStart >= 2) {
-          const base = positions.length / 3;
-          for (let r = runStart; r < i; r++) {
-            const [lx, lz] = rows[r].left;
-            const [rx, rz] = rows[r].right;
-            positions.push(lx, elevationAt(lx, lz) + 0.3, lz);
-            positions.push(rx, elevationAt(rx, rz) + 0.3, rz);
-          }
-          for (let r = 0; r < i - runStart - 1; r++) {
-            const a = base + r * 2;
-            indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
-          }
-        }
-        runStart = null;
-      }
-    }
-  }
-
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geo.setIndex(indices);
-  const mat = new THREE.MeshBasicMaterial({
-    color: C.road.color,
-    opacity: C.road.opacity,
-    transparent: true,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  });
-  return new THREE.Mesh(geo, mat);
-}
-
-function buildBuildings() {
-  const group = new THREE.Group();
-  for (const b of mapData.buildings) {
-    const x1 = Math.min(b.corners[0][0], b.corners[2][0]);
-    const x2 = Math.max(b.corners[0][0], b.corners[2][0]);
-    const z1 = Math.min(b.corners[0][1], b.corners[2][1]);
-    const z2 = Math.max(b.corners[0][1], b.corners[2][1]);
-    const w = x2 - x1;
-    const d = z2 - z1;
-    const h = b.height;
-    const geo = new THREE.BoxGeometry(w, h, d);
-    // 面 = 背景色（不透明・裏面非表示）
-    const mat = new THREE.MeshBasicMaterial({
-      color: C.building.color,
-      opacity: C.building.opacity,
-      transparent: C.building.opacity < 1,
-      side: THREE.FrontSide,
-    });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(x1 + w / 2, h / 2, z1 + d / 2);
-    group.add(mesh);
-    // 輪郭 = 灰色（エッジライン）
-    const edges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(geo),
-      new THREE.LineBasicMaterial({ color: C.building.edge }),
-    );
-    edges.position.copy(mesh.position);
-    group.add(edges);
-  }
-  return group;
-}
-
-function buildMarkers() {
-  const group = new THREE.Group();
-  for (const st of mapData.stations) {
-    const [x, z] = st.pos;
-    const elev = elevationAt(x, z);
-    const pillarGeo = new THREE.CylinderGeometry(0.5, 0.5, 8, 8);
-    const pillarMat = new THREE.MeshBasicMaterial({
-      color: C.station.color, opacity: 0.6, transparent: true,
-    });
-    const pillar = new THREE.Mesh(pillarGeo, pillarMat);
-    pillar.position.set(x, elev + 4, z);
-    group.add(pillar);
-    const sphereGeo = new THREE.SphereGeometry(3, 12, 8);
-    const sphereMat = new THREE.MeshBasicMaterial({
-      color: C.station.color, opacity: 0.9, transparent: true,
-    });
-    const sphere = new THREE.Mesh(sphereGeo, sphereMat);
-    sphere.position.set(x, elev + 9, z);
-    group.add(sphere);
-  }
-  const [cx, cz] = mapData.cresome.pos;
-  const ce = elevationAt(cx, cz);
-  const cGeo = new THREE.ConeGeometry(5, 15, 8);
-  const cMat = new THREE.MeshBasicMaterial({
-    color: C.cresome.color, opacity: 0.9, transparent: true,
-  });
-  const cone = new THREE.Mesh(cGeo, cMat);
-  cone.position.set(cx, ce + 7.5, cz);
-  group.add(cone);
-  return group;
+  const last = pts3[pts3.length - 1];
+  return { pos: last.clone(), dir: new THREE.Vector3(0, 0, 1) };
 }
 
 // ============================================================
@@ -318,9 +143,14 @@ export default function MapBackground({
     const container = containerRef.current;
     if (!container) return undefined;
 
+    let disposed = false;
+    let rafId = 0;
+
     const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0xffffff, 1800, 4500);
+
     const camera = new THREE.PerspectiveCamera(
-      60, container.clientWidth / container.clientHeight, 0.1, 2000,
+      60, container.clientWidth / container.clientHeight, 0.1, 5000,
     );
     const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
     renderer.setSize(container.clientWidth, container.clientHeight);
@@ -328,12 +158,26 @@ export default function MapBackground({
     renderer.setClearColor(0x000000, 0);
     container.appendChild(renderer.domElement);
 
-    scene.add(buildTerrain());
-    scene.add(buildRoads());
-    for (const rail of mapData.railways) scene.add(buildGroundLine(rail.points, C.railway, 0.4));
-    scene.add(buildBuildings());
-    scene.add(buildMarkers());
+    // ENU（x=東, y=北, z=上）→ three.js Y-up 変換用グループ
+    const world = new THREE.Group();
+    world.rotation.x = -Math.PI / 2;
+    scene.add(world);
 
+    // 読み込みインジケータ（全 GLB 読み込み後に削除）
+    const loadEl = document.createElement('div');
+    loadEl.textContent = '地図を読み込んでいます…';
+    loadEl.style.cssText =
+      'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;' +
+      'color:#8a8f98;font-size:14px;font-family:inherit;';
+    container.appendChild(loadEl);
+
+    // ---------- アニメーション状態 ----------
+    const anim = { t: 0, lastTime: 0 };
+
+    // ルート状態（init で routes.json を読み込み後に構築）
+    const routesDataRef = { current: null };
+    let routePts3 = [];  // three.js 座標の配列
+    let routeLen = 0;
     let routeLine = null;
     let movingDot = null;
 
@@ -359,17 +203,64 @@ export default function MapBackground({
 
     // フォーカスポイント・ヘディングをルート進捗 t に即座にスナップ（視点切替・ルート切替時）
     function snapToRoute(t) {
+      if (routePts3.length < 2) return;
+      const { pos, dir } = routePointAt(routePts3, t);
+      focus.x = pos.x; focus.y = pos.y; focus.z = pos.z;
+      heading = Math.atan2(dir.x, dir.z);
+    }
+
+    // stationId / direction に応じてルートを再構築
+    function updateRoute() {
       const cfg = configRef.current;
-      let pts = mapData.routes[cfg.stationId] || mapData.routes.otsuka;
+      if (!routesDataRef.current) return;
+
+      // 古いルート・ドットを破棄
+      if (routeLine) {
+        scene.remove(routeLine);
+        routeLine.geometry.dispose();
+        routeLine.material.dispose();
+        routeLine = null;
+      }
+      if (movingDot) {
+        scene.remove(movingDot);
+        movingDot.geometry.dispose();
+        movingDot.material.dispose();
+        movingDot = null;
+      }
+
+      const stationName = ROUTE_NAMES[cfg.stationId] || ROUTE_NAMES.otsuka;
+      const route = routesDataRef.current.routes.find((r) => r.station === stationName);
+      if (!route || route.points.length < 2) return;
+
+      let pts = route.points;
       if (cfg.direction === -1) pts = [...pts].reverse();
-      const p = routePointAt(pts, t);
-      focus.x = p.x; focus.y = elevationSmooth(p.x, p.z); focus.z = p.z;
-      heading = Math.atan2(p.dx, p.dz);
+      routePts3 = pts.map((p) => enuToV3(p));
+      routeLen = routeLength(routePts3);
+
+      // ルートチューブ（viewer と同様の丸め曲線 + TubeGeometry）
+      const curve = buildRoundedCurve(routePts3, 1.0);
+      const segs = Math.max(Math.round(routeLen / 0.5), 64);
+      const tubeGeo = new THREE.TubeGeometry(curve, segs, ROUTE_TUBE_RADIUS, 8, false);
+      const tubeMat = new THREE.MeshBasicMaterial({
+        color: ROUTE_COLOR, transparent: true, opacity: 0.8, depthWrite: false,
+      });
+      routeLine = new THREE.Mesh(tubeGeo, tubeMat);
+      routeLine.renderOrder = 10; // 建物より前面
+      scene.add(routeLine);
+
+      // 移動ドット（routes.json の z は眼高込み）
+      const dotGeo = new THREE.SphereGeometry(1.5, 16, 12);
+      const dotMat = new THREE.MeshBasicMaterial({ color: DOT_COLOR });
+      movingDot = new THREE.Mesh(dotGeo, dotMat);
+      scene.add(movingDot);
+
+      anim.t = 0;
+      snapToRoute(0);
     }
 
     // 停止（始点に戻る）: ルート進捗をリセットしカメラを始点へ
     function resetRoute() {
-      animRef.current.t = 0;
+      anim.t = 0;
       snapToRoute(0);
     }
 
@@ -387,102 +278,138 @@ export default function MapBackground({
       ctl.pitch = clamp(ctl.pitch, -1.2, 1.2);
     }
 
-    function updateRoute() {
-      const cfg = configRef.current;
-      if (routeLine) {
-        scene.remove(routeLine);
-        routeLine.geometry.dispose();
-        routeLine.material.dispose();
-      }
-      if (movingDot) {
-        scene.remove(movingDot);
-        movingDot.geometry.dispose();
-        movingDot.material.dispose();
-      }
-      let pts = mapData.routes[cfg.stationId] || mapData.routes.otsuka;
-      if (cfg.direction === -1) pts = [...pts].reverse();
-      routeLine = buildGroundLine(pts, C.route, 0.5);
-      scene.add(routeLine);
-      const dotGeo = new THREE.SphereGeometry(2, 12, 8);
-      const dotMat = new THREE.MeshBasicMaterial({ color: C.moving.color, opacity: 1 });
-      movingDot = new THREE.Mesh(dotGeo, dotMat);
-      scene.add(movingDot);
-      animRef.current.t = 0;
-      snapToRoute(0);
+    // ---------- GLB レイヤー読込（public/map/） ----------
+    async function init() {
+      const base = `${import.meta.env.BASE_URL}map/`;
+      const loader = new GLTFLoader();
+
+      const [manifestRes, routesRes] = await Promise.all([
+        fetch(base + 'manifest.json'),
+        fetch(base + 'routes.json'),
+      ]);
+      const manifest = await manifestRes.json();
+      routesDataRef.current = await routesRes.json();
+      if (disposed) return;
+
+      // 全レイヤーを並列ロード（個別失敗でも残りは読み込む）
+      await Promise.all(
+        manifest.layers.map(
+          (layer) =>
+            new Promise((resolve) => {
+              loader.load(
+                base + layer.file,
+                (gltf) => {
+                  if (disposed) {
+                    resolve();
+                    return;
+                  }
+                  gltf.scene.traverse((o) => {
+                    if (!o.isMesh) return;
+                    const old = o.material;
+                    const isTerrain = layer.id === 'terrain';
+                    const isLines = layer.id === 'lines'; // 路線チューブは半透明（地形が見える）
+                    o.material = new THREE.MeshBasicMaterial({
+                      vertexColors: !!o.geometry.attributes.color,
+                      polygonOffset: true,
+                      polygonOffsetFactor: isTerrain ? 1 : 0.5,
+                      polygonOffsetUnits: isTerrain ? 1 : 0.5,
+                      transparent: isLines,
+                      opacity: isLines ? 0.5 : 1.0,
+                    });
+                    old.dispose();
+                  });
+                  world.add(gltf.scene);
+                  resolve();
+                },
+                undefined,
+                (err) => {
+                  console.warn(`マップレイヤー読込失敗 (${layer.id}):`, err);
+                  resolve();
+                },
+              );
+            }),
+        ),
+      );
+      if (disposed) return;
+
+      loadEl.remove();
+
+      // 初期カメラ: クリサム社屋に向ける（manifest の位置、viewer と同じオフセット）
+      const c3 = enuToV3(manifest.cresome.position);
+      focus.x = c3.x;
+      focus.y = c3.y;
+      focus.z = c3.z;
+      camera.position.set(c3.x + 260, c3.y + 210, c3.z + 300);
+      camera.lookAt(c3);
+
+      updateRoute();
     }
 
-    const animRef = { current: { t: 0, lastTime: 0 } };
-    updateRoute();
 
-    let rafId = 0;
+    // ---------- アニメーションループ ----------
     function frame(now) {
       rafId = requestAnimationFrame(frame);
       const cfg = configRef.current;
-      const dt = animRef.current.lastTime ? (now - animRef.current.lastTime) / 1000 : 0;
-      animRef.current.lastTime = now;
+      const dt = anim.lastTime ? (now - anim.lastTime) / 1000 : 0;
+      anim.lastTime = now;
 
-      let pts = mapData.routes[cfg.stationId] || mapData.routes.otsuka;
-      if (cfg.direction === -1) pts = [...pts].reverse();
+      if (routePts3.length >= 2) {
+        // ルート進捗（中断中は進行しない）
+        if (cfg.playing && routeLen > 0) {
+          anim.t += (cfg.speed * dt) / routeLen;
+          if (anim.t > 1) anim.t -= 1;
+        }
 
-      // ルート進捗（中断中は進行しない）
-      if (cfg.playing) {
-        const totalLen = routeLength(pts);
-        animRef.current.t += (cfg.speed * dt) / totalLen;
-        if (animRef.current.t > 1) animRef.current.t -= 1;
-      }
+        const { pos, dir } = routePointAt(routePts3, anim.t);
+        if (movingDot) movingDot.position.copy(pos);
 
-      const { x, z, dx, dz } = routePointAt(pts, animRef.current.t);
-      const elev = elevationSmooth(x, z);
+        // キーボードによるカメラ操作
+        applyKeyDelta(dt);
 
-      if (movingDot) movingDot.position.set(x, elev + 2, z);
+        // フォーカスポイントとヘディング: フレームレート非依存の指数平滑
+        const alpha = dt > 0 ? 1 - Math.exp(-5.0 * dt) : 1;
+        focus.x += (pos.x - focus.x) * alpha;
+        focus.y += (pos.y - focus.y) * alpha;
+        focus.z += (pos.z - focus.z) * alpha;
+        let dh = Math.atan2(dir.x, dir.z) - heading;
+        dh = Math.atan2(Math.sin(dh), Math.cos(dh)); // 最短角で補間
+        heading += dh * alpha;
 
-      // キーボードによるカメラ操作
-      applyKeyDelta(dt);
+        // 視点切替時は旧位置からのスイープを防ぐため即座にスナップ
+        if (lastViewpoint !== null && lastViewpoint !== cfg.viewpoint) snapToRoute(anim.t);
+        lastViewpoint = cfg.viewpoint;
 
-      // フォーカスポイントとヘディング: フレームレート非依存の指数平滑
-      const alpha = dt > 0 ? 1 - Math.exp(-5.0 * dt) : 1;
-      focus.x += (x - focus.x) * alpha;
-      focus.y += (elev - focus.y) * alpha;
-      focus.z += (z - focus.z) * alpha;
-      let dh = Math.atan2(dx, dz) - heading;
-      dh = Math.atan2(Math.sin(dh), Math.cos(dh)); // 最短角で補間
-      heading += dh * alpha;
-
-      // 視点切替時は旧位置からのスイープを防ぐため即座にスナップ
-      if (lastViewpoint !== null && lastViewpoint !== cfg.viewpoint) snapToRoute(animRef.current.t);
-      lastViewpoint = cfg.viewpoint;
-
-      if (cfg.viewpoint === 'walking') {
-        // 歩行: 一人称視点（目線 1.6m）+ ユーザーの回転・パン・前後オフセット
-        const yaw = heading + ctl.yaw;
-        const pitch = clamp(ctl.pitch - 0.04, -1.2, 1.2);
-        const dirX = Math.cos(pitch) * Math.sin(yaw);
-        const dirY = Math.sin(pitch);
-        const dirZ = Math.cos(pitch) * Math.cos(yaw);
-        const off = 50 * (ctl.zoom - 1); // ホイールズーム = 視線方向への前後オフセット (m)
-        const ex = focus.x + ctl.panX + dirX * off;
-        const ey = focus.y + EYE_H + ctl.panY + dirY * off;
-        const ez = focus.z + ctl.panZ + dirZ * off;
-        camera.position.set(ex, ey, ez);
-        camera.lookAt(ex + dirX * 50, ey + dirY * 50, ez + dirZ * 50);
-      } else {
-        // 俯瞰: フォーカスポイントを中心とした軌道カメラ + ユーザーの回転・パン・ズーム（画面上 = 北）
-        const el = AERIAL_ELEV + ctl.pitch;
-        const r = AERIAL_R * ctl.zoom;
-        const az = ctl.yaw;
-        const ox = Math.cos(el) * Math.sin(az) * r;
-        const oy = Math.sin(el) * r;
-        const oz = Math.cos(el) * Math.cos(az) * r;
-        const fx = focus.x + ctl.panX;
-        const fy = focus.y + ctl.panY;
-        const fz = focus.z + ctl.panZ;
-        camera.position.set(fx + ox, fy + oy, fz + oz);
-        camera.lookAt(fx, fy, fz);
+        if (cfg.viewpoint === 'walking') {
+          // 歩行: ルート上の眼高（routes.json の z に既反映）+ ユーザーの回転・パン・前後オフセット
+          const yaw = heading + ctl.yaw;
+          const pitch = clamp(ctl.pitch - 0.04, -1.2, 1.2);
+          const dirX = Math.cos(pitch) * Math.sin(yaw);
+          const dirY = Math.sin(pitch);
+          const dirZ = Math.cos(pitch) * Math.cos(yaw);
+          const off = 50 * (ctl.zoom - 1); // ホイールズーム = 視線方向への前後オフセット (m)
+          const ex = focus.x + ctl.panX + dirX * off;
+          const ey = focus.y + ctl.panY + dirY * off;
+          const ez = focus.z + ctl.panZ + dirZ * off;
+          camera.position.set(ex, ey, ez);
+          camera.lookAt(ex + dirX * 50, ey + dirY * 50, ez + dirZ * 50);
+        } else {
+          // 俯瞰: フォーカスポイントを中心とした軌道カメラ + ユーザーの回転・パン・ズーム（画面上 = 北）
+          const el = AERIAL_ELEV + ctl.pitch;
+          const r = AERIAL_R * ctl.zoom;
+          const az = ctl.yaw;
+          const ox = Math.cos(el) * Math.sin(az) * r;
+          const oy = Math.sin(el) * r;
+          const oz = Math.cos(el) * Math.cos(az) * r;
+          const fx = focus.x + ctl.panX;
+          const fy = focus.y + ctl.panY;
+          const fz = focus.z + ctl.panZ;
+          camera.position.set(fx + ox, fy + oy, fz + oz);
+          camera.lookAt(fx, fy, fz);
+        }
       }
 
       renderer.render(scene, camera);
     }
-    rafId = requestAnimationFrame(frame);
 
     function onResize() {
       const w = container.clientWidth;
@@ -492,7 +419,6 @@ export default function MapBackground({
       renderer.setSize(w, h);
     }
     window.addEventListener('resize', onResize);
-
     // ---------- マウス / キーボード カメラ制御 ----------
     // 背景 canvas は pointer-events:none のため window 側で受ける。
     // 背景のコンテナ要素（body / .main / .page 等）がターゲットのときだけ引き継ぎ、
@@ -595,14 +521,21 @@ export default function MapBackground({
         running = false;
       } else if (!running) {
         running = true;
-        animRef.current.lastTime = 0;
+        anim.lastTime = 0;
         rafId = requestAnimationFrame(frame);
       }
     }
     document.addEventListener('visibilitychange', onVis);
 
+    init().catch((err) => {
+      console.warn('マップ背景の初期化失敗:', err);
+      if (loadEl.parentNode) loadEl.remove();
+    });
+    rafId = requestAnimationFrame(frame);
+
     threeRef.current = { scene, camera, renderer, container, updateRoute, resetRoute };
     return () => {
+      disposed = true;
       cancelAnimationFrame(rafId);
       window.removeEventListener('resize', onResize);
       window.removeEventListener('pointerdown', onPointerDown);
@@ -615,10 +548,27 @@ export default function MapBackground({
       window.removeEventListener('contextmenu', onContext);
       window.removeEventListener('blur', onBlur);
       document.removeEventListener('visibilitychange', onVis);
+      if (routeLine) {
+        routeLine.geometry.dispose();
+        routeLine.material.dispose();
+      }
+      if (movingDot) {
+        movingDot.geometry.dispose();
+        movingDot.material.dispose();
+      }
+      // GLB レイヤーのリソース破棄
+      world.traverse((o) => {
+        if (!o.isMesh) return;
+        if (o.geometry) o.geometry.dispose();
+        const m = o.material;
+        if (Array.isArray(m)) m.forEach((mm) => mm.dispose());
+        else if (m) m.dispose();
+      });
       renderer.dispose();
       if (renderer.domElement.parentNode) {
         renderer.domElement.parentNode.removeChild(renderer.domElement);
       }
+      if (loadEl.parentNode) loadEl.remove();
       threeRef.current = null;
     };
   }, []);
@@ -635,3 +585,4 @@ export default function MapBackground({
 
   return <div ref={containerRef} className="map-bg" aria-hidden="true" />;
 }
+

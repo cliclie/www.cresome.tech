@@ -1,7 +1,7 @@
 /**
  * 地図モードの制御UI（サイドバー内表示）
  *
- * - 始点駅選択（3駅）
+ * - 始点選択（7駅 / 10始点）
  * - 視点切替（歩行 / 俯瞰）
  * - 向き切替（駅→クリサム / クリサム→駅）
  * - 速度スライダー（徒歩 1.4 m/s 〜 車 14 m/s）
@@ -9,11 +9,7 @@
  * - カメラ操作ヒント（マウス / キーボード）
  */
 
-const STATIONS = [
-  { id: 'otsuka', label: '大塚駅(山手線)' },
-  { id: 'higashi_ikebukuro', label: '東池袋駅(丸ノ内線)' },
-  { id: 'shin_otsuka', label: '新大塚駅(丸ノ内線)' },
-];
+import { STATION_GROUPS } from '../data/stationPoints';
 
 const SPEED_MIN = 1.4; // 徒歩
 const SPEED_MAX = 14;  // 車
@@ -38,17 +34,27 @@ export default function MapControls({
       <div className="map-controls-section">
         <div className="map-controls-sublabel">始点</div>
         <div className="map-controls-stations">
-          {STATIONS.map((st) => (
-            <button
-              key={st.id}
-              type="button"
-              className={
-                'map-controls-btn' + (stationId === st.id ? ' active' : '')
-              }
-              onClick={() => onStationChange(st.id)}
-            >
-              {st.label}
-            </button>
+          {STATION_GROUPS.map((group) => (
+            <div key={group.line} className="map-controls-station-group">
+              <div className="map-controls-station-group-label">
+                {group.line}
+              </div>
+              <div className="map-controls-station-items">
+                {group.items.map((st) => (
+                  <button
+                    key={st.id}
+                    type="button"
+                    className={
+                      'map-controls-btn' +
+                      (stationId === st.id ? ' active' : '')
+                    }
+                    onClick={() => onStationChange(st.id)}
+                  >
+                    {st.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       </div>

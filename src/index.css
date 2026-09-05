@@ -231,7 +231,23 @@ body {
 .map-controls-toggle {
   display: flex;
   flex-direction: column;
+  gap: 6px;
+}
+.map-controls-station-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.map-controls-station-group-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--faint);
+}
+.map-controls-station-items {
+  display: flex;
   gap: 4px;
+  flex-wrap: wrap;
 }
 .map-controls-btn {
   padding: 5px 8px;
