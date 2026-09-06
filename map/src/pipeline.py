@@ -411,6 +411,115 @@ def _boundary_lines(geom):
     return []
 
 
+def _densify_polyline(coords_2d, max_seg=3.0):
+    """Subdivide a 2D polyline (N,2) so consecutive points are <= max_seg apart.
+
+    If the polyline is closed (first == last), the output is also closed.
+    Returns a densified (M, 2) ndarray.
+    """
+    coords_2d = np.asarray(coords_2d, dtype=float)
+    n = len(coords_2d)
+    if n < 2:
+        return coords_2d
+    is_closed = np.allclose(coords_2d[0], coords_2d[-1], atol=1e-6)
+    pts = coords_2d[:-1] if is_closed else coords_2d
+    n_pts = len(pts)
+    result = [pts[0]]
+    # For closed rings, also wrap around (last point -> first point)
+    n_segs = n_pts if is_closed else (n_pts - 1)
+    for i in range(n_segs):
+        a = pts[i]
+        b = pts[(i + 1) % n_pts]
+        d = float(np.hypot(b[0] - a[0], b[1] - a[1]))
+        if d < 1e-9:
+            continue
+        n_sub = max(1, int(np.ceil(d / max_seg)))
+        for k in range(1, n_sub + 1):
+            t = k / n_sub
+            result.append(a + t * (b - a))
+    if is_closed:
+        result.append(pts[0])
+    return np.array(result)
+
+
+def _terrain_conform_polyline(coords_2d, terrain):
+    """2Dポリラインを、各直線セグメントが必ず1つの地形三角形内に収まるよう分割する。
+
+    地形は規則グリッド＋セル対角線（左下↔右上）で平面分割されている。固定間隔の
+    サンプリングだと直線区間が対角線（或はグリッド線）をまたぎ、その直線コードが
+    分平面地形面（=terrain.height）より下を切って「地形に埋もれる」ことがある。
+    ここではグリッド線・対角線との交差 t を全て求めて分割することで、各セグメント
+    が単一三角形内に収まり、3D直線が常に terrain+オフセット にピッタリ沿う。
+    閉ループ（先頭==末尾）は出力も閉ループにする。
+    """
+    coords_2d = np.asarray(coords_2d, dtype=float)
+    n = len(coords_2d)
+    if n < 2:
+        return coords_2d
+    is_closed = np.allclose(coords_2d[0], coords_2d[-1], atol=1e-6)
+    pts = coords_2d[:-1] if is_closed else coords_2d
+    n_pts = len(pts)
+    cell = terrain.cell
+    min_x, min_y = terrain.min_x, terrain.min_y
+    base = min_x - min_y
+    result = [pts[0]]
+    n_segs = n_pts if is_closed else (n_pts - 1)
+    for i in range(n_segs):
+        a = pts[i]
+        b = pts[(i + 1) % n_pts]
+        ax, ay = float(a[0]), float(a[1])
+        bx, by = float(b[0]), float(b[1])
+        dx, dy = bx - ax, by - ay
+        if abs(dx) < 1e-12 and abs(dy) < 1e-12:
+            continue
+        ts = [0.0, 1.0]
+        x_lo, x_hi = (ax, bx) if ax <= bx else (bx, ax)
+        y_lo, y_hi = (ay, by) if ay <= by else (by, ay)
+        # 縦グリッド線 x = min_x + i*cell
+        if abs(dx) > 1e-12:
+            i_lo = int(np.floor((x_lo - min_x) / cell))
+            i_hi = int(np.floor((x_hi - min_x) / cell))
+            for gi in range(i_lo + 1, i_hi + 1):
+                t = (min_x + gi * cell - ax) / dx
+                if 0.0 < t < 1.0:
+                    ts.append(t)
+        # 横グリッド線 y = min_y + j*cell
+        if abs(dy) > 1e-12:
+            j_lo = int(np.floor((y_lo - min_y) / cell))
+            j_hi = int(np.floor((y_hi - min_y) / cell))
+            for gj in range(j_lo + 1, j_hi + 1):
+                t = (min_y + gj * cell - ay) / dy
+                if 0.0 < t < 1.0:
+                    ts.append(t)
+        # セル対角線 x - y = base + (i - j)*cell
+        denom = dx - dy
+        if abs(denom) > 1e-12:
+            i0 = int(np.floor((x_lo - min_x) / cell))
+            i1 = int(np.floor((x_hi - min_x) / cell))
+            j0 = int(np.floor((y_lo - min_y) / cell))
+            j1 = int(np.floor((y_hi - min_y) / cell))
+            for j in range(j0, j1 + 1):
+                for gi in range(i0, i1 + 1):
+                    C = base + (gi - j) * cell
+                    t = (C - (ax - ay)) / denom
+                    if 0.0 < t < 1.0:
+                        x = ax + t * dx
+                        y = ay + t * dy
+                        if (min_x + gi * cell <= x <= min_x + (gi + 1) * cell
+                                and min_y + j * cell <= y <= min_y + (j + 1) * cell):
+                            ts.append(t)
+        ts = sorted(ts)
+        ts2 = [ts[0]]
+        for t in ts[1:]:
+            if t - ts2[-1] > 1e-7:
+                ts2.append(t)
+        for k in range(1, len(ts2)):
+            result.append(a + ts2[k] * (b - a))
+    if is_closed:
+        result.append(pts[0])
+    return np.array(result)
+
+
 def building_outline_paths(buildings, terrain, hexc):
     """建物の屋根外周 + 底面外周 + 角の垂直線 → Path3D（白地図風の線画）。"""
     parts = []
@@ -418,19 +527,23 @@ def building_outline_paths(buildings, terrain, hexc):
         ring = b["rings"]
         if len(ring) < 4:
             continue
-        rx = np.array([p[0] for p in ring])
-        ry = np.array([p[1] for p in ring])
-        z_ground = terrain.height(rx, ry)  # 各頂点の地面標高
-        z_base = float(z_ground.min())
-        z_roof = z_base + b["height"]  # 屋根面（塗り潰しメッシュとぴったりに一致）
+        ring_2d = np.array(ring, dtype=float)
+        # 頂点間を最大 3m 間隔でサブディバイドし、地形面に沿わせる
+        ring_d = _terrain_conform_polyline(ring_2d, terrain)
+        rx = ring_d[:, 0]
+        ry = ring_d[:, 1]
+        # 建物メッシュと完全に一致させる（オフセットなし）
+        z_ground = terrain.height(rx, ry)
+        z_roof = float(terrain.height(ring_2d[:, 0], ring_2d[:, 1]).max()) + b["height"]
         # 屋根外周
-        parts.append(np.column_stack([rx, ry, np.full(len(ring), z_roof)]))
+        parts.append(np.column_stack([rx, ry, np.full(len(ring_d), z_roof)]))
         # 底面外周（地面に接地。z-fighting はビュワー側の polygonOffset で回避）
         parts.append(np.column_stack([rx, ry, z_ground]))
-        # 角の垂直線（底面外周から屋根外周まで）
-        for i in range(len(ring) - 1):  # ring は閉ループ（先頭==末尾）
-            x, y = ring[i]
-            parts.append(np.array([[x, y, z_ground[i]], [x, y, z_roof]]))
+        # 角の垂直線（底面外周から屋根外周まで）— 元の頂点のみ
+        z_ground_orig = terrain.height(ring_2d[:, 0], ring_2d[:, 1])
+        for i in range(len(ring_2d) - 1):  # ring は閉ループ（先頭==末尾）
+            x, y = ring_2d[i]
+            parts.append(np.array([[x, y, z_ground_orig[i]], [x, y, z_roof]]))
     return _line_path(parts, hexc)
 
 
@@ -446,8 +559,9 @@ def road_outline_paths(roads, terrain, hexc):
         coords = np.asarray(g.coords, dtype=float)
         if len(coords) < 2:
             continue
-        zs = terrain.height(coords[:, 0], coords[:, 1])
-        parts.append(np.column_stack([coords, zs]))
+        coords_d = _terrain_conform_polyline(coords, terrain)
+        zs = terrain.height(coords_d[:, 0], coords_d[:, 1]) + config.Z_LINE_OFFSET
+        parts.append(np.column_stack([coords_d, zs]))
     return _line_path(parts, hexc)
 
 
@@ -468,8 +582,9 @@ def park_hatch_paths(parks, terrain, hexc, spacing=10.0):
                     coords = np.asarray(g.coords, dtype=float)
                     if len(coords) < 2:
                         continue
-                    zs = terrain.height(coords[:, 0], coords[:, 1])
-                    parts.append(np.column_stack([coords, zs]))
+                    coords_d = _terrain_conform_polyline(coords, terrain)
+                    zs = terrain.height(coords_d[:, 0], coords_d[:, 1]) + config.Z_LINE_OFFSET
+                    parts.append(np.column_stack([coords_d, zs]))
     return _line_path(parts, hexc)
 
 
@@ -490,8 +605,9 @@ def water_wave_paths(water, terrain, hexc, spacing=12.0, wavelength=16.0, amp=1.
                     coords = np.asarray(g.coords, dtype=float)
                     if len(coords) < 2:
                         continue
-                    zs = terrain.height(coords[:, 0], coords[:, 1])
-                    parts.append(np.column_stack([coords, zs]))
+                    coords_d = _terrain_conform_polyline(coords, terrain)
+                    zs = terrain.height(coords_d[:, 0], coords_d[:, 1]) + config.Z_LINE_OFFSET
+                    parts.append(np.column_stack([coords_d, zs]))
     return _line_path(parts, hexc)
 
 
@@ -518,16 +634,17 @@ def building_meshes(buildings, terrain, color=None, shrink=0.0):
         if m is None or len(m.vertices) == 0:
             n_skip += 1
             continue
-        # 底面を地形に追従させ接地（斜面で埋没しない）。屋根面は平面（最低標高+height）に保つ
+        # 底面を地形に追従させ接地。屋根面は平面（フットプリント最高地+height）に保つ
+        # → 急斜面でも建物が地形に埋もれない
         rx = np.array([p[0] for p in b["rings"]])
         ry = np.array([p[1] for p in b["rings"]])
-        z_base = float(terrain.height(rx, ry).min())
+        z_roof = float(terrain.height(rx, ry).max()) + b["height"]
         v = m.vertices
         h = b["height"]
         bottom_mask = v[:, 2] < h / 2
         top_mask = v[:, 2] >= h / 2
         v[bottom_mask, 2] = terrain.height(v[bottom_mask, 0], v[bottom_mask, 1])
-        v[top_mask, 2] = z_base + h
+        v[top_mask, 2] = z_roof
         m.vertices = v
         if color is None:
             usage = b.get("usage")
@@ -543,8 +660,9 @@ def tube_mesh(points_local, radius: float, hexc: str, terrain) -> trimesh.Trimes
     if len(points_local) < 2:
         return None
     pts = np.asarray(points_local, dtype=float)
-    zs = terrain.height(pts[:, 0], pts[:, 1]) + config.LINE_HEIGHT
-    path = list(zip(pts[:, 0].tolist(), pts[:, 1].tolist(), zs.tolist()))
+    pts_d = _densify_polyline(pts[:, :2], max_seg=3.0)
+    zs = terrain.height(pts_d[:, 0], pts_d[:, 1]) + config.LINE_HEIGHT
+    path = list(zip(pts_d[:, 0].tolist(), pts_d[:, 1].tolist(), zs.tolist()))
     try:
         # trimesh 5.x の sweep_polygon は shapely Polygon をプロファイルに要求する
         angles = np.linspace(0.0, 2 * np.pi, 13)[:-1]

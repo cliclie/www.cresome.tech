@@ -81,6 +81,9 @@ STATION_MARKER_HEIGHT = 8.0 # 駅マーカーの基準高さ (m)
 Z_WATER = 0.03
 Z_ROAD = 0.06
 Z_PARK = 0.10
+# 白地図の線画用: 地形面からわずかに浮かせz-fightingを防止
+# 1cmで十分（ビュワー側の polygonOffset が主要な z-fighting 対策）
+Z_LINE_OFFSET = 0.01
 
 # ---------------------------------------------------------------- 地形（DEM）
 TERRAIN_CELL = 10.0         # 地面グリッド解像度 (m)

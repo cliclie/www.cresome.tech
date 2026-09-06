@@ -59,7 +59,8 @@ map/
 │  ├─ routes.py         最短経路計算: OSM highway → 道路グラフ + Dijkstra → out/routes.json
 │  ├─ verify_stations.py  駅位置のOSM照合チェック
 │  ├─ verify_glb.py     out/ のGLB整合性チェック（頂点数・bbox・頂点色）
-│  └─ verify_changes.py 白地図 roads.glb / 地形の突き抜け検証
+│  ├─ verify_changes.py 白地図 roads.glb / 地形の突き抜け検証
+│  └─ _verify_no_bury.py 地形に埋もれる頂点の有無を検証（GLB読み込み→terrain.height比較）
 ├─ data/           生データ（.gitignore対象）
 │  ├─ plateau/       文京区・豊島区のCityGML（メッシュ別GML）+ 関連GeoJSON
 │  └─ osm/           Overpass API取得データ + cresome_loc.json（社屋座標）
@@ -166,15 +167,24 @@ Dijkstra 法により計算し `out/routes.json` に出力します。
 これにより地形メッシュと完全に一致し、斜面で地形がオブジェクト表面から突き抜ける
 現象が構造的に解消される。
 
+### 地形三角形境界での線分分割（`_terrain_conform_polyline`）
+
+線画（建物外周・道路境界・公園ハッチ・水部波線・路線チューブ）は、各セグメントが
+地形グリッドの三角形内に収まるよう、グリッド線・対角線との交点で分割する
+（`_terrain_conform_polyline` / `_densify_polyline`）。これにより 3D 直線セグメントが
+常に terrain.height（三角形平面補間）の面上を走り、地形に埋もれることが構造的にない。
+
 ## 高さの基準
 
-- **道路境界線**（白地図）: 地形（DEM）標高のみ（常に地面に接地）
-- **建物底面外周**（白地図）: 地形（DEM）標高のみ
-- **公園ハッチ・水部波線**（白地図）: 地形（DEM）標高のみ
-- **建物屋根面**: 最低標高 + 高さ（完全平面、+0.1m で Z-fighting 回避）
+- **道路境界線**（白地図）: 地形（DEM）標高 + 0.01m
+- **建物底面外周**（白地図）: 地形（DEM）標高（建物メッシュと完全一致）
+- **公園ハッチ・水部波線**（白地図）: 地形（DEM）標高 + 0.01m
+- **建物屋根面**: フットプリント最高地 + 高さ（完全平面）
 
-従来の小数的オフセット（道路 +0.1m / 建物底面 +0.05m / 公園 +0.3m / 水部 +0.3m）は
-すべて廃止した。
+z-fighting 対策は主にビュワー側の polygonOffset で対応。
+線画は GL_LINES として描画されるため polygonOffset が効かず、
+物理オフセット 0.01m（1cm）で最小限に浮かせた。
+建物底面外周はメッシュの底面と完全に同一標高（オフセットなし）。
 
 ## z-fighting 回避（ビュワー側 polygonOffset）
 
@@ -192,25 +202,24 @@ Dijkstra 法により計算し `out/routes.json` に出力します。
 - **白地図**（out_white/）: 道路塗りつぶしは廃止し、境界線のみで表現
 - **デフォルト**（out/）: 道路塗りつぶし（灰色）を維持
 
-# 現行ビルド実績（2026-09-04、DEM対応＋クリサム社屋切り出し版）
+# 現行ビルド実績（2026-09-06、地形三角形追従 + z-offset最小化版）
 
 ```
-  dedupe: 8個の内容同一ファイルをスキップ   （区境界を跨ぐメッシュは文京・豊島両ZIPに同一ファイルで含まれるためMD5重複除去）
 buildings: files=9/47 total=30694 used=17811   （bbox内に交差する建物のみ採用）
-  クリサム社屋特定（点から0.0m）: 高さ=8.9m 用途=住宅 → cresome_building.glb に切り出し
+  クリサム社屋特定（点から0.0m）: 高さ=10.8m 用途=住宅 → cresome_building.glb に切り出し
 tran: polygons=5675 / wtr: polygons=822 / parks(osm): polygons=41
-stations: 7/7 / lines: JR山手線・有楽町線・丸ノ内線・都電荒川線
+stations: 10 開始点 / lines: JR山手線・有楽町線・丸ノ内線・都電荒川線
 terrain grid: 216x244 nodes (10.0m), elev [0.1, 34.2] m
-== export ==（合計 約48秒）
-terrain.glb          meshes=    1 verts= 52704 size= 2.10 MB
-buildings.glb        meshes=    1 verts=229796 size= 8.34 MB   （基部はDEM接地）
-cresome_building.glb meshes=    1 verts=    14 size= 0.00 MB   （クリサム社屋、高さ8.9m）
-roads.glb            meshes=    1 verts= 48065 size= 1.21 MB   （地面標高に沿う）
-parks.glb            meshes=    1 verts=   517 size= 0.01 MB
-water.glb            meshes=    1 verts=  2466 size= 0.05 MB
-lines.glb            meshes=    1 verts=  1536 size= 0.06 MB   （路線は地面から浮き上がり）
-stations.glb         meshes=   21 verts=  1722 size= 0.04 MB   （マーカー基部はDEM接地）
-cresome.glb          meshes=    1 verts=   110 size= 0.01 MB   （標高29.4mに接地）
+== export ==（合計 約55秒）
+terrain.glb          meshes=    1 verts=  52704 size= 2.10 MB
+buildings.glb        meshes=    2 verts=1063850 size=30.23 MB  （線画 + メッシュ）
+cresome_building.glb meshes=    2 verts=     36 size= 0.00 MB
+roads.glb            meshes=    1 verts=  97004 size= 3.07 MB
+parks.glb            meshes=    2 verts=  28142 size= 0.69 MB
+water.glb            meshes=    2 verts=  19387 size= 0.44 MB
+lines.glb            meshes=    1 verts=  45948 size= 1.84 MB  （3m間隔デンスファイ）
+stations.glb         meshes=   10 verts=    500 size= 0.01 MB
+cresome.glb          meshes=    1 verts=     50 size= 0.00 MB
 ```
 
 ※ dedupe導入前は両区共有の境界メッシュ6件が二重パースされ、約15,000件の重複建物ジオメトリ

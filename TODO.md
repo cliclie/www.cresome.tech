@@ -62,3 +62,18 @@
       `routes.json` の station 名と `ROUTE_NAMES` の一致確認（ブラウザでの目視は実施者のみ）
 - [x] main にコミット・プッシュ（`7ece525` 以降）
 - [x] publish worktree を dist/ + CNAME で同期しコミット・プッシュ（`npm run deploy`）
+
+## 5. 地形三角形追従・z-offset最小化 — 2026-09-06 完了
+- [x] `terrain.py` `height()`: 双線形補間 → 三角形平面補間（`build_mesh` と同一の対角分割方式）
+      - 鞍部セルで地形面と最大 `|z00+z11-z10-z01|/2` 乖離していた双線形補間を廃止
+      - `terrain.height` が描画される地形面と完全に一致するよう修正
+- [x] `pipeline.py` に `_terrain_conform_polyline()` を追加:
+      - 線画（建物外周・道路境界・公園ハッチ・水部波線）を地形グリッドの三角形境界で分割
+      - 各セグメントが単一三角形内に収まり、地形面に埋もれない
+- [x] `pipeline.py` `building_meshes()`: 屋根面をフットプリント最高地+高さに変更（最低地→最高地）
+- [x] `pipeline.py` `building_outline_paths()`: 底面外周をオフセットなし（メッシュと一致）、屋根面をフットプリント最高地+高さに統一
+- [x] `pipeline.py` `tube_mesh()`: `_densify_polyline`（3m間隔）で細分化し地形追従を改善
+- [x] `config.py` `Z_LINE_OFFSET`: 0.10m → 0.01m（1cm）
+      - z-fighting は主にビュワー側 polygonOffset で回避、線画は 1cm で十分
+- [x] `_verify_no_bury.py`: GLB 読み込み → terrain.height 比較で埋もれ検証（全レイヤー 0 buried → PASS）
+- [x] `public/map/` への再デプロイ + `npm run deploy`

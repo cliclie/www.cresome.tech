@@ -118,7 +118,15 @@ class Terrain:
 
     # ------------------------------------------------------------- サンプル
     def height(self, x, y):
-        """地面標高(m)を双線形補間で取得。スカラー/配列対応。"""
+        """地面標高(m)。地形メッシュ(build_mesh)と同一の三角形平面補間。スカラー/配列対応。
+
+        build_mesh と同じ対角分割（左下(a)→右上(d)）:
+          tx >= ty: 三角形(a,b,d) → z = (1-tx)*z00 + (tx-ty)*z10 + ty*z11
+          tx <  ty: 三角形(a,d,c) → z = (1-ty)*z00 + tx*z11 + (ty-tx)*z01
+        これにより、道路・建物・路線等の接地標高が描画される地形面と完全に一致する
+        （従来は双線形補間のため、鞍部等のセルで地形面と最大 |z00+z11-z10-z01|/2 まで乖離し、
+        地形が道路・建物を突き抜ける原因となっていた）。
+        """
         fx = (np.asarray(x, dtype=float) - self.min_x) / self.cell
         fy = (np.asarray(y, dtype=float) - self.min_y) / self.cell
         i0 = np.clip(np.floor(fx).astype(int), 0, self.nx - 2)
@@ -126,11 +134,13 @@ class Terrain:
         tx = np.clip(fx - i0, 0.0, 1.0)
         ty = np.clip(fy - j0, 0.0, 1.0)
         h = self.h
-        v00 = h[j0, i0]
-        v10 = h[j0, i0 + 1]
-        v01 = h[j0 + 1, i0]
-        v11 = h[j0 + 1, i0 + 1]
-        return (v00 * (1 - tx) + v10 * tx) * (1 - ty) + (v01 * (1 - tx) + v11 * tx) * ty
+        z00 = h[j0, i0]
+        z10 = h[j0, i0 + 1]
+        z01 = h[j0 + 1, i0]
+        z11 = h[j0 + 1, i0 + 1]
+        z1 = (1 - tx) * z00 + (tx - ty) * z10 + ty * z11      # 下半 tx>=ty: △(a,b,d)
+        z2 = (1 - ty) * z00 + tx * z11 + (ty - tx) * z01      # 上半 tx<ty:  △(a,d,c)
+        return np.where(tx >= ty, z1, z2)
 
     # ------------------------------------------------------------- メッシュ
     def build_mesh(self) -> trimesh.Trimesh:
