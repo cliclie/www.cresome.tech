@@ -60,7 +60,11 @@ map/
 │  ├─ verify_stations.py  駅位置のOSM照合チェック
 │  ├─ verify_glb.py     out/ のGLB整合性チェック（頂点数・bbox・頂点色）
 │  ├─ verify_changes.py 白地図 roads.glb / 地形の突き抜け検証
-│  └─ _verify_no_bury.py 地形に埋もれる頂点の有無を検証（GLB読み込み→terrain.height比較）
+│  ├─ _verify_no_bury.py 地形に埋もれる頂点の有無を検証（GLB読み込み→terrain.height比較）
+│  ├─ _verify_road_offset.py 道路境界線と面のZオフセット検証（旧flat-offset方式用）
+│  ├─ _proto_lines.py     大量エンティティの Path3D 生成・GLB エクスポートコスト検証（合成データ）
+│  ├─ _test_path_color.py Path3D の GLB エクスポートで COLOR_0 が頂点単位に展開されるか確認
+│  └─ _test_scene_mixed.py Trimesh + Path3D を1つのSceneに含めてGLB出力できるか確認
 ├─ data/           生データ（.gitignore対象）
 │  ├─ plateau/       文京区・豊島区のCityGML（メッシュ別GML）+ 関連GeoJSON
 │  └─ osm/           Overpass API取得データ + cresome_loc.json（社屋座標）
