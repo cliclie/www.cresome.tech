@@ -29,8 +29,6 @@ export default function BgSwitcher({ value, onChange }) {
           onClick={() => onChange('map')}
         >
           地図
-          <br />
-          (beta)
         </button>
       </div>
     </div>

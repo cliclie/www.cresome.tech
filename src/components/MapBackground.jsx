@@ -12,7 +12,11 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
  *
  * 視点モード:
  * - walking: ルート上の眼高（1.6m）で進行方向に追従
- * - aerial:  高所から斜めに俯瞰
+ * - aerial:  高所から斜めに俯瞰（軌道カメラ）
+ *
+ * サブパネル（PiP）: 画面下部の小窓に「現在の表示モードと逆」の視点を描画
+ * - PiP = 歩行: 眼高の歩行視点（ルートチューブは描画しない）
+ * - PiP = 俯瞰: 歩行点の周囲 50m を真上から表示。視野扇（60°）内は背景色（線なし）、扇外は薄い線色。オレンジルーツューブは表示（扇型自体は非表示）
  *
  * マウス / キーボードでのカメラ操作（両視点共通）:
  * - ドラッグ: 視点回転 / 右ドラッグ or Shift+ドラッグ: パン
@@ -44,8 +48,26 @@ const ROUTE_NAMES = {
 const ROUTE_COLOR = 0xef5b00;
 const DOT_COLOR = 0xff9d4d;
 const ROUTE_TUBE_RADIUS = 0.3;
+const ROUTE_TUBE_OPACITY = 0.5;   // ルートチューブの不透明度（文字色程度に薄め）
+const RAIL_LINE_OPACITY = 0.5;   // 路線レイヤーの不透明度（文字色程度に薄め）
+const ROAD_LINE_OPACITY = 0.55;  // 道路ネットワークラインの不透明度（文字色程度に薄め）
 const AERIAL_H = 350;       // 俯瞰視点の高さ (m)
 const AERIAL_TILT = 0.6;    // 俯瞰視点の前方オフセット倍率
+// PiP（俯瞰モード）: 歩行点の周囲 50m を真上から表示
+const PI_AERIAL_RADIUS = 50; // 表示半径 (m)
+const PI_AERIAL_H = PI_AERIAL_RADIUS / Math.tan(THREE.MathUtils.degToRad(30)); // カメラ高さ（60° FOV で半径 50m）
+const PI_FAN_HALF_ANGLE = THREE.MathUtils.degToRad(30); // 視野扇の半角（= カメラ縦 FOV の半分）
+const PI_LINE_OUT = 0.75; // PiP 俯瞰: 視界外（扇外）の線不透明度係数（通常の線色より薄く）
+
+// 線系レイヤーの不透明度エントリ生成（PiP 俯瞰モードの二階調線色用）
+// opacity = 通常の線色 / dim = 視野扇外（通常の線色より薄く）。扇内はクリップで描画しない＝背景色
+function makeLineEntry(mat, base) {
+  return {
+    mat,
+    opacity: base,
+    dim: base * PI_LINE_OUT,
+  };
+}
 
 // ============================================================
 // 座標変換: ENU [x, y, z] → three.js Vector3
@@ -116,6 +138,7 @@ export default function MapBackground({
   speed = 5,
   playing = true,
   resetToken = 0,
+  pipRef = null,
 }) {
   const containerRef = useRef(null);
   const threeRef = useRef(null);
@@ -139,6 +162,7 @@ export default function MapBackground({
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setClearColor(0x000000, 0);
+    renderer.localClippingEnabled = true; // マテリアル単位クリップ面（PiP 俯瞰モード用）
     container.appendChild(renderer.domElement);
 
     // ENU（x=東, y=北, z=上）→ three.js Y-up 変換用グループ
@@ -163,25 +187,89 @@ export default function MapBackground({
     let routeCurve = null; // ルートの丸め CurvePath（ドット位置・ヘディング用）
     let routeLen = 0;
     let routeLine = null;
+    let routeFlat = null; // 平面化ルート（俯瞰・一人称用）
     let movingDot = null;
 
     // ---------- カメラ状態 ----------
     // ルートのフォーカスポイント（平滑化済み）とヘディング（平滑化済み）
     const focus = { x: 0, y: 0, z: 0 };
     let heading = 0;
-    // ユーザーカメラ制御（マウス/キーボード）: 追従カメラの上に回転・パン・ズームを載せる
-    const ctl = { yaw: 0, pitch: 0, zoom: 1, panX: 0, panY: 0, panZ: 0 };
+    // ユーザーカメラ制御（マウス/キーボード）: 追従カメラの上に回転・パン・ズーム・FOV を載せる
+    const ctl = { yaw: 0, pitch: 0, zoom: 1, panX: 0, panY: 0, panZ: 0, fov: 0 };
+    // 俯瞰の既定の軌道半径・仰角（ターゲットからのオフセット (0, AERIAL_H, AERIAL_TILT*AERIAL_H) と等価）
+    const AERIAL_R = Math.hypot(AERIAL_H, AERIAL_TILT * AERIAL_H);
+    const AERIAL_ELEV = Math.asin(AERIAL_H / AERIAL_R);
+    // サブパネル（PiP）用カメラ: 「現在の表示モードと逆」の視点を描画
+    const pipCam = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 5000);
+    // PiP 俯瞰モード: 視野扇（円扇形）＋ ウェッジクリップ平面（無効時 constant=巨大値）
+    const clipPlaneA = new THREE.Plane(new THREE.Vector3(0, 0, 1), 1e9);
+    const clipPlaneB = new THREE.Plane(new THREE.Vector3(0, 0, -1), 1e9);
+    const lineMats = []; // 線系レイヤー（路線/道路/アウトライン）の二階調線色用
+    const grayLineObjs = new Map(); // 灰色線のオブジェクト → 元マテリアル（PiP 俯瞰パス2: 白色マテリアルへ交換して扇内を消す）
+    // 背景と同じ色（白）の白色ラインマテリアル: 視野扇内部で線色を消すため
+    const whiteLineMat = new THREE.LineBasicMaterial({ color: 0xffffff, depthWrite: false });
+    const whiteMeshMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff, polygonOffset: true, polygonOffsetFactor: 0.5, polygonOffsetUnits: 0.5, depthWrite: false,
+    });
+    whiteLineMat.clippingPlanes = [clipPlaneA, clipPlaneB];
+    whiteMeshMat.clippingPlanes = [clipPlaneA, clipPlaneB];
+    let fanMesh = null;
+    let fanEdge = null;
+
+    // 視野扇: 原点中心・中心線 = +Z 方向（heading で回す）、半径 50m
+    {
+      const segs = 24;
+      const fanPos = [0, 0, 0];
+      const ringPos = [];
+      const fanIdx = [];
+      for (let i = 0; i <= segs; i++) {
+        const a = -PI_FAN_HALF_ANGLE + (2 * PI_FAN_HALF_ANGLE * i) / segs;
+        const x = Math.sin(a) * PI_AERIAL_RADIUS;
+        const z = Math.cos(a) * PI_AERIAL_RADIUS;
+        fanPos.push(x, 0, z);
+        ringPos.push(x, 0, z);
+      }
+      for (let i = 0; i < segs; i++) fanIdx.push(0, i + 1, i + 2);
+      const fanGeo = new THREE.BufferGeometry();
+      fanGeo.setAttribute('position', new THREE.Float32BufferAttribute(fanPos, 3));
+      fanGeo.setIndex(fanIdx);
+      fanMesh = new THREE.Mesh(
+        fanGeo,
+        new THREE.MeshBasicMaterial({
+          color: ROUTE_COLOR,
+          transparent: true,
+          opacity: 0.1,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+        }),
+      );
+      fanMesh.renderOrder = 11;
+      fanMesh.visible = false;
+      scene.add(fanMesh);
+
+      const edgeGeo = new THREE.BufferGeometry();
+      edgeGeo.setAttribute('position', new THREE.Float32BufferAttribute(ringPos, 3));
+      fanEdge = new THREE.Line(
+        edgeGeo,
+        new THREE.LineBasicMaterial({
+          color: ROUTE_COLOR,
+          transparent: true,
+          opacity: 0.5,
+          depthWrite: false,
+        }),
+      );
+      fanEdge.renderOrder = 12;
+      fanEdge.visible = false;
+      scene.add(fanEdge);
+    }
     const keys = new Set();
     let lastViewpoint = null;
     const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
-    // 俯瞰の既定の軌道半径・仰角（ターゲットからのオフセット (0, AERIAL_H, AERIAL_TILT*AERIAL_H) と等価）
-    const AERIAL_R = Math.hypot(AERIAL_H, AERIAL_TILT * AERIAL_H);
-    const AERIAL_ELEV = Math.asin(AERIAL_H / AERIAL_R);
 
     // ユーザーカメラオフセットをリセット（R キー）
     function resetCamCtl() {
-      ctl.yaw = 0; ctl.pitch = 0; ctl.zoom = 1;
+      ctl.yaw = 0; ctl.pitch = 0; ctl.zoom = 1; ctl.fov = 0;
       ctl.panX = 0; ctl.panY = 0; ctl.panZ = 0;
     }
 
@@ -194,17 +282,45 @@ export default function MapBackground({
       heading = Math.atan2(dir.x, dir.z);
     }
 
+    // ---------- PiP 俯瞰モード用ヘルパー ----------
+    // クリップ平面を無効化（constant を巨大値にすると全点が通過する）
+    function setClipDisabled() {
+      clipPlaneA.constant = 1e9;
+      clipPlaneB.constant = 1e9;
+    }
+    // 歩行点 o において heading h 中心・±PI_FAN_HALF_ANGLE の視野扇（ウェッジ）を形成する 2 平面を設定
+    function setWedgePlanes(o, h) {
+      const t = PI_FAN_HALF_ANGLE;
+      clipPlaneA.normal.set(Math.cos(h - t), 0, -Math.sin(h - t));
+      clipPlaneA.constant = -(clipPlaneA.normal.x * o.x + clipPlaneA.normal.z * o.z);
+      clipPlaneB.normal.set(-Math.cos(h + t), 0, Math.sin(h + t));
+      clipPlaneB.constant = -(clipPlaneB.normal.x * o.x + clipPlaneB.normal.z * o.z);
+    }
+    // 線系レイヤーの不透明度レベルを設定（PiP 俯瞰モード: 視野扇の内外で二階調線色）
+    // 'out' = 視野扇外の線（通常の線色より薄く）/ それ以外 = 基本
+    function setLineMatsLevel(level) {
+      for (const e of lineMats) {
+        e.mat.opacity = level === 'out' ? e.dim : e.opacity;
+      }
+    }
+
     // stationId / direction に応じてルートを再構築
     function updateRoute() {
       const cfg = configRef.current;
       if (!routesDataRef.current) return;
 
-      // 古いルート・ドットを破棄
+      // 古いルート・平面化ルート・ドットを破棄
       if (routeLine) {
         scene.remove(routeLine);
         routeLine.geometry.dispose();
         routeLine.material.dispose();
         routeLine = null;
+      }
+      if (routeFlat) {
+        scene.remove(routeFlat);
+        routeFlat.geometry.dispose();
+        routeFlat.material.dispose();
+        routeFlat = null;
       }
       if (movingDot) {
         scene.remove(movingDot);
@@ -227,11 +343,25 @@ export default function MapBackground({
       const segs = Math.max(Math.round(routeLen / 0.5), 64);
       const tubeGeo = new THREE.TubeGeometry(routeCurve, segs, ROUTE_TUBE_RADIUS, 8, false);
       const tubeMat = new THREE.MeshBasicMaterial({
-        color: ROUTE_COLOR, transparent: true, opacity: 0.8, depthWrite: false,
+        color: ROUTE_COLOR, transparent: true, opacity: ROUTE_TUBE_OPACITY, depthWrite: false,
       });
       routeLine = new THREE.Mesh(tubeGeo, tubeMat);
       routeLine.renderOrder = 10; // 建物より前面
       scene.add(routeLine);
+
+      // 平面化ルート（俯瞰・一人称用）: ルートを地面に投影し半透明化
+      // （routes.json の z は眼高 1.6m 込みなので 1.45 を引いて地面から 0.15m 上に据える）
+      const flatPts = routePts3.map(
+        (p) => new THREE.Vector3(p.x, p.y - 1.45, p.z),
+      );
+      const flatCurve = buildRoundedCurve(flatPts, 1.0);
+      const flatGeo = new THREE.TubeGeometry(flatCurve, segs, 0.15, 6, false);
+      const flatMat = new THREE.MeshBasicMaterial({
+        color: ROUTE_COLOR, transparent: true, opacity: 0.55, depthWrite: false,
+      });
+      routeFlat = new THREE.Mesh(flatGeo, flatMat);
+      routeFlat.renderOrder = 9;
+      scene.add(routeFlat);
 
       // 移動ドット（routes.json の z は眼高込み）
       const dotGeo = new THREE.SphereGeometry(1.5, 16, 12);
@@ -302,13 +432,26 @@ export default function MapBackground({
                         polygonOffsetFactor: isTerrain ? 1 : 0.5,
                         polygonOffsetUnits: isTerrain ? 1 : 0.5,
                         transparent: isRail,
-                        opacity: isRail ? 0.5 : 1.0,
+                        opacity: isRail ? RAIL_LINE_OPACITY : 1.0,
                       });
+                      if (isRail) {
+                        o.material.clippingPlanes = [clipPlaneA, clipPlaneB];
+                        lineMats.push(makeLineEntry(o.material, RAIL_LINE_OPACITY));
+                        grayLineObjs.set(o, o.material);
+                      }
                       old.dispose();
                     } else if (o.isLine) {
-                      // 道路ネットワーク（LINES プリミティブ）: 光源不要の非発光ライン
+                      // 道路ネットワーク（LINES プリミティブ）: 非発光の半透明ライン（文字色程度に薄め）
                       const old = o.material;
-                      o.material = new THREE.LineBasicMaterial({ vertexColors: hasColor });
+                      o.material = new THREE.LineBasicMaterial({
+                        vertexColors: hasColor,
+                        transparent: true,
+                        opacity: ROAD_LINE_OPACITY,
+                        depthWrite: false,
+                      });
+                      o.material.clippingPlanes = [clipPlaneA, clipPlaneB];
+                      lineMats.push(makeLineEntry(o.material, ROAD_LINE_OPACITY));
+                      grayLineObjs.set(o, o.material);
                       old.dispose();
                     }
                   });
@@ -346,6 +489,7 @@ export default function MapBackground({
       const cfg = configRef.current;
       const dt = anim.lastTime ? (now - anim.lastTime) / 1000 : 0;
       anim.lastTime = now;
+      let routePos = null; // 現在のルート上の位置（PiP 用）
 
       if (routeCurve) {
         // ルート進捗（中断中は進行しない）
@@ -355,8 +499,15 @@ export default function MapBackground({
         }
 
         const pos = routeCurve.getPointAt(anim.t);
+        routePos = pos;
         const dir = routeCurve.getTangentAt(anim.t);
         if (movingDot) movingDot.position.copy(pos);
+
+        // ルート表示: フレーム開始時に全非表示。各ビュー（メイン / PiP）で必要分だけ ON にし、
+        // 描画後に元に戻す（別ビューへ漏れないよう制御）
+        if (routeLine) routeLine.visible = false;
+        if (routeFlat) routeFlat.visible = false;
+        if (movingDot) movingDot.visible = false;
 
         // キーボードによるカメラ操作
         applyKeyDelta(dt);
@@ -403,7 +554,97 @@ export default function MapBackground({
         }
       }
 
+      // メインビュー（全画面）: 俯瞰 = 平面化ルート＋現在地球体 / 歩行 = 非表示
+      if (cfg.viewpoint === 'aerial') {
+        if (routeFlat) routeFlat.visible = true;
+        if (movingDot) movingDot.visible = true;
+      }
+      renderer.setViewport(0, 0, renderer.domElement.clientWidth, renderer.domElement.clientHeight);
+      renderer.setScissorTest(false);
       renderer.render(scene, camera);
+      if (routeFlat) routeFlat.visible = false;
+      if (movingDot) movingDot.visible = false;
+
+      // サブパネル（PiP）: 「現在の表示モードと逆」の視点を小窓に描画
+      const pipEl = pipRef ? pipRef.current : null;
+      if (pipEl && routePos) {
+        const rect = pipEl.getBoundingClientRect();
+        if (rect.width > 4 && rect.height > 4) {
+          const px = Math.round(rect.left);
+          const py = Math.round(renderer.domElement.clientHeight - rect.bottom);
+          const pw = Math.round(rect.width);
+          const ph = Math.round(rect.height);
+          const isPipAerial = cfg.viewpoint === 'walking'; // メイン=歩行 → PiP=俯瞰
+          if (!isPipAerial) {
+            // PiP = 歩行: ルート上の現在位置のデフォルト姿勢（眼高 + 進行方向）。チューブは描画しない。
+            const pYaw = heading;
+            const pPitch = -0.04;
+            const pDirX = Math.cos(pPitch) * Math.sin(pYaw);
+            const pDirY = Math.sin(pPitch);
+            const pDirZ = Math.cos(pPitch) * Math.cos(pYaw);
+            pipCam.up.set(0, 1, 0);
+            pipCam.position.set(routePos.x, routePos.y, routePos.z);
+            pipCam.lookAt(
+              routePos.x + pDirX * 50,
+              routePos.y + pDirY * 50,
+              routePos.z + pDirZ * 50,
+            );
+          } else {
+            // PiP = 俯瞰: 歩行点の周囲 200m を真上から（北 = 画面上方向）
+            pipCam.up.set(0, 0, -1);
+            pipCam.position.set(routePos.x, routePos.y + PI_AERIAL_H, routePos.z);
+            pipCam.lookAt(routePos.x, routePos.y, routePos.z);
+          }
+          pipCam.aspect = pw / ph;
+          pipCam.updateProjectionMatrix();
+          renderer.setViewport(px, py, pw, ph);
+          renderer.setScissor(px, py, pw, ph);
+          renderer.setScissorTest(true);
+
+          if (isPipAerial) {
+            // 俯瞰 PiP: 扇内 = 背景色（線を見せない）/ 扇外 = 薄い線色
+            // オレンジルーツューブはクリップ・減光なしで常に描画。扇型自体は非表示。
+            if (routeLine) routeLine.visible = true;
+
+            // パス1: クリップ無効 + 扇外レベル（薄い線色）で全体を描画
+            setClipDisabled();
+            setLineMatsLevel('out');
+            renderer.render(scene, pipCam);
+
+            // パス2: 視野扇（ウェッジ）内部の灰色線を「背景と同じ白色」で再描画して消す。
+            // 不透明メッシュ（地形・建物等）がパス1の結果を上書きするのを防ぐため、
+            // 線系以外の可視オブジェクトを一時的に非表示にして、線系のみを再描画する。
+            setWedgePlanes(routePos, heading); // クリップ = 扇の内側のみ
+            const hiddenForPass2 = [];
+            scene.traverse((obj) => {
+              if ((obj.isMesh || obj.isLine || obj.isPoints) && obj.visible) {
+                if (!grayLineObjs.has(obj)) {
+                  hiddenForPass2.push(obj);
+                  obj.visible = false;
+                } else {
+                  obj.material = obj.isMesh ? whiteMeshMat : whiteLineMat;
+                }
+              }
+            });
+
+            renderer.autoClearColor = false;
+            renderer.autoClearDepth = false;
+            renderer.render(scene, pipCam);
+            renderer.autoClearColor = true;
+            renderer.autoClearDepth = true;
+
+            for (const obj of hiddenForPass2) obj.visible = true;
+            for (const [obj, mat] of grayLineObjs) obj.material = mat; // 元マテリアル復元
+            setLineMatsLevel('base'); // メインビュー用の基本不透明度へ復元
+            setClipDisabled();
+
+            if (routeLine) routeLine.visible = false;
+          } else {
+            renderer.render(scene, pipCam);
+          }
+          renderer.setScissorTest(false);
+        }
+      }
     }
 
     function onResize() {
@@ -429,7 +670,7 @@ export default function MapBackground({
         return false;
       }
       const cls = typeof el.className === 'string' ? el.className : '';
-      return /\b(main|page-wrap|page|map-bg)\b/.test(cls);
+      return /\b(main|page-wrap|page|map-bg|map-pip|map-bottom)\b/.test(cls);
     }
 
     let dragMode = null; // 'rotate' | 'pan'
@@ -546,6 +787,10 @@ export default function MapBackground({
       if (routeLine) {
         routeLine.geometry.dispose();
         routeLine.material.dispose();
+      }
+      if (routeFlat) {
+        routeFlat.geometry.dispose();
+        routeFlat.material.dispose();
       }
       if (movingDot) {
         movingDot.geometry.dispose();

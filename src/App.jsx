@@ -120,6 +120,9 @@ export default function App() {
   const [mapResetToken, setMapResetToken] = useState(0);
   const resetMapRoute = () => setMapResetToken((n) => n + 1);
 
+  // サブパネル（PiP）ウィンドウの ref（MapBackground が描画）
+  const pipRef = useRef(null);
+
   return (
     <>
       {bgMode === 'wave' ? (
@@ -134,6 +137,7 @@ export default function App() {
           speed={mapConfig.speed}
           playing={mapConfig.playing}
           resetToken={mapResetToken}
+          pipRef={pipRef}
         />
       )}
       <Sidebar
@@ -141,9 +145,6 @@ export default function App() {
         onSelect={showPage}
         bgMode={bgMode}
         onBgModeChange={setBgMode}
-        mapConfig={mapConfig}
-        onMapConfigChange={updateMapConfig}
-        onMapReset={resetMapRoute}
       />
       <Topbar onMenu={() => setDrawerOpen(true)} />
       <Drawer
@@ -153,12 +154,31 @@ export default function App() {
         onSelect={showPage}
         bgMode={bgMode}
         onBgModeChange={setBgMode}
-        mapConfig={mapConfig}
-        onMapConfigChange={updateMapConfig}
-        onMapReset={resetMapRoute}
       />
 
       <main className="main">
+        {bgMode === 'map' && mapConfig && (
+          <div className="map-bottom">
+            <MapControls
+              stationId={mapConfig.stationId}
+              onStationChange={(id) => updateMapConfig({ stationId: id })}
+              viewpoint={mapConfig.viewpoint}
+              onViewpointChange={(v) => updateMapConfig({ viewpoint: v })}
+              direction={mapConfig.direction}
+              onDirectionChange={(d) => updateMapConfig({ direction: d })}
+              speed={mapConfig.speed}
+              onSpeedChange={(s) => updateMapConfig({ speed: s })}
+              playing={mapConfig.playing}
+              onPlayingChange={(p) => updateMapConfig({ playing: p })}
+              onResetRoute={resetMapRoute}
+            />
+            <div className="map-pip" ref={pipRef}>
+              <span className="map-pip-label">
+                {mapConfig.viewpoint === 'aerial' ? '歩行' : '俯瞰'}
+              </span>
+            </div>
+          </div>
+        )}
         <div className="page-wrap">
           {PAGES.map(({ id, Component }) => (
             <section

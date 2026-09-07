@@ -1,5 +1,4 @@
 import BgSwitcher from './BgSwitcher';
-import MapControls from './MapControls';
 
 export default function Drawer({
   items,
@@ -8,9 +7,6 @@ export default function Drawer({
   onSelect,
   bgMode,
   onBgModeChange,
-  mapConfig,
-  onMapConfigChange,
-  onMapReset,
 }) {
   return (
     <>
@@ -37,21 +33,6 @@ export default function Drawer({
           ))}
         </nav>
         <BgSwitcher value={bgMode} onChange={onBgModeChange} />
-        {bgMode === 'map' && mapConfig && (
-          <MapControls
-            stationId={mapConfig.stationId}
-            onStationChange={(id) => onMapConfigChange({ stationId: id })}
-            viewpoint={mapConfig.viewpoint}
-            onViewpointChange={(v) => onMapConfigChange({ viewpoint: v })}
-            direction={mapConfig.direction}
-            onDirectionChange={(d) => onMapConfigChange({ direction: d })}
-            speed={mapConfig.speed}
-            onSpeedChange={(s) => onMapConfigChange({ speed: s })}
-            playing={mapConfig.playing}
-            onPlayingChange={(p) => onMapConfigChange({ playing: p })}
-            onResetRoute={onMapReset}
-          />
-        )}
         <div className="drawer-foot">© cresome.tech</div>
       </aside>
     </>

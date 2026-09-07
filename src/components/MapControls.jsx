@@ -1,8 +1,11 @@
 /**
- * 地図モードの制御UI（サイドバー内表示）
+ * 地図モードの制御UI（メインコンテンツ側の上書きパネル）
+ *
+ * 地図モード選択時にメインコンテンツ上部へ表示されるオプション操作パネル。
+ * 横並びレイアウト（幅不足時は折り返し）+ 半透明白背景。
  *
  * - 始点選択（7駅 / 10始点）
- * - 視点切替（歩行 / 俯瞰）
+ * - 視点切替（歩行 / 俯瞰）（サブパネル PiP: 地図 canvas に現在の表示モードの反対側を小窓表示）
  * - 向き切替（駅→クリサム / クリサム→駅）
  * - 速度スライダー（徒歩 1.4 m/s 〜 車 14 m/s）
  * - 再生制御（音楽プレーヤー風: ▶/⏸ 中断・再開、⏮ 停止=始点へ戻る）
@@ -29,38 +32,34 @@ export default function MapControls({
 }) {
   return (
     <div className="map-controls">
-      <div className="map-controls-label">地図設定</div>
-
-      <div className="map-controls-section">
-        <div className="map-controls-sublabel">始点</div>
-        <div className="map-controls-stations">
-          {STATION_GROUPS.map((group) => (
-            <div key={group.line} className="map-controls-station-group">
-              <div className="map-controls-station-group-label">
-                {group.line}
-              </div>
-              <div className="map-controls-station-items">
-                {group.items.map((st) => (
-                  <button
-                    key={st.id}
-                    type="button"
-                    className={
-                      'map-controls-btn' +
-                      (stationId === st.id ? ' active' : '')
-                    }
-                    onClick={() => onStationChange(st.id)}
-                  >
-                    {st.label}
-                  </button>
-                ))}
-              </div>
+      <div className="map-controls-group">
+        <span className="map-controls-sublabel">始点</span>
+        {STATION_GROUPS.map((group) => (
+          <div key={group.line} className="map-controls-station-group">
+            <span className="map-controls-station-group-label">
+              {group.line}
+            </span>
+            <div className="map-controls-station-items">
+              {group.items.map((st) => (
+                <button
+                  key={st.id}
+                  type="button"
+                  className={
+                    'map-controls-btn' +
+                    (stationId === st.id ? ' active' : '')
+                  }
+                  onClick={() => onStationChange(st.id)}
+                >
+                  {st.label}
+                </button>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
 
-      <div className="map-controls-section">
-        <div className="map-controls-sublabel">視点</div>
+      <div className="map-controls-group">
+        <span className="map-controls-sublabel">視点</span>
         <div className="map-controls-toggle">
           <button
             type="button"
@@ -83,8 +82,8 @@ export default function MapControls({
         </div>
       </div>
 
-      <div className="map-controls-section">
-        <div className="map-controls-sublabel">向き</div>
+      <div className="map-controls-group">
+        <span className="map-controls-sublabel">向き</span>
         <div className="map-controls-toggle">
           <button
             type="button"
@@ -107,10 +106,10 @@ export default function MapControls({
         </div>
       </div>
 
-      <div className="map-controls-section">
-        <div className="map-controls-sublabel">
+      <div className="map-controls-group">
+        <span className="map-controls-sublabel">
           速度（{speed.toFixed(1)} m/s）
-        </div>
+        </span>
         <input
           type="range"
           className="map-controls-slider"
@@ -126,8 +125,8 @@ export default function MapControls({
         </div>
       </div>
 
-      <div className="map-controls-section">
-        <div className="map-controls-sublabel">再生</div>
+      <div className="map-controls-group">
+        <span className="map-controls-sublabel">再生</span>
         <div className="map-controls-player">
           <button
             type="button"
@@ -156,19 +155,14 @@ export default function MapControls({
             />
           </button>
         </div>
-        <div className="map-controls-slider-labels">
-          <span>停止（最初へ）</span>
-          <span>{playing ? '中断' : '再開'}</span>
-        </div>
       </div>
 
-      <div className="map-controls-section map-controls-hint">
-        <div className="map-controls-sublabel">カメラ操作</div>
+      <div className="map-controls-group map-controls-hint">
+        <span className="map-controls-sublabel">カメラ操作</span>
         <div className="map-controls-hint-text">
-          ドラッグ：視点移動<br />
-          右ドラッグ / Shift+ドラッグ：パン<br />
-          ホイール：ズーム<br />
-          WASD / 矢印：回転、Q/E：上下、R：リセット
+          ドラッグ: 視点回転 / ホイール: ズーム / 右ドラッグ: カメラパン
+          <br />
+          WASD・矢印: 視点回転 / Q/E: 上下移動 / R: リセット
         </div>
       </div>
     </div>

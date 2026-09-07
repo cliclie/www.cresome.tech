@@ -1,8 +1,7 @@
 import logo from '../../images/cresome_logo.svg';
 import BgSwitcher from './BgSwitcher';
-import MapControls from './MapControls';
 
-export default function Sidebar({ items, onSelect, bgMode, onBgModeChange, mapConfig, onMapConfigChange, onMapReset }) {
+export default function Sidebar({ items, onSelect, bgMode, onBgModeChange }) {
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -24,22 +23,6 @@ export default function Sidebar({ items, onSelect, bgMode, onBgModeChange, mapCo
       </nav>
 
       <BgSwitcher value={bgMode} onChange={onBgModeChange} />
-
-      {bgMode === 'map' && mapConfig && (
-        <MapControls
-          stationId={mapConfig.stationId}
-          onStationChange={(id) => onMapConfigChange({ stationId: id })}
-          viewpoint={mapConfig.viewpoint}
-          onViewpointChange={(v) => onMapConfigChange({ viewpoint: v })}
-          direction={mapConfig.direction}
-          onDirectionChange={(d) => onMapConfigChange({ direction: d })}
-          speed={mapConfig.speed}
-          onSpeedChange={(s) => onMapConfigChange({ speed: s })}
-          playing={mapConfig.playing}
-          onPlayingChange={(p) => onMapConfigChange({ playing: p })}
-          onResetRoute={onMapReset}
-        />
-      )}
 
       <div className="sidebar-foot">
         © cresome.tech<br />
