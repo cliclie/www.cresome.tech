@@ -16,7 +16,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
  *
  * サブパネル（PiP）: 画面下部の小窓に「現在の表示モードと逆」の視点を描画
  * - PiP = 歩行: 眼高の歩行視点（ルートチューブは描画しない）
- * - PiP = 俯瞰: 歩行点の周囲 50m を真上から表示。視野扇（60°）内は背景色（線なし）、扇外は薄い線色。オレンジルーツューブは表示（扇型自体は非表示）
+ * - PiP = 俯瞰: 歩行点の周囲 50m を真上から表示。視界内は塗りつぶさず、道路・建物アウトライン等の線は通常の線色で描画。オレンジルーツューブも表示
  *
  * マウス / キーボードでのカメラ操作（両視点共通）:
  * - ドラッグ: 視点回転 / 右ドラッグ or Shift+ドラッグ: パン
@@ -56,18 +56,6 @@ const AERIAL_TILT = 0.6;    // 俯瞰視点の前方オフセット倍率
 // PiP（俯瞰モード）: 歩行点の周囲 50m を真上から表示
 const PI_AERIAL_RADIUS = 50; // 表示半径 (m)
 const PI_AERIAL_H = PI_AERIAL_RADIUS / Math.tan(THREE.MathUtils.degToRad(30)); // カメラ高さ（60° FOV で半径 50m）
-const PI_FAN_HALF_ANGLE = THREE.MathUtils.degToRad(30); // 視野扇の半角（= カメラ縦 FOV の半分）
-const PI_LINE_OUT = 0.30; // PiP 俯瞰: 視界外（扇外）の線不透明度係数（通常の線色より薄く）
-
-// 線系レイヤーの不透明度エントリ生成（PiP 俯瞰モードの二階調線色用）
-// opacity = 通常の線色 / dim = 視野扇外（通常の線色より薄く）。扇内はクリップで描画しない＝背景色
-function makeLineEntry(mat, base) {
-  return {
-    mat,
-    opacity: base,
-    dim: base * PI_LINE_OUT,
-  };
-}
 
 // ============================================================
 // 座標変換: ENU [x, y, z] → three.js Vector3
@@ -162,7 +150,6 @@ export default function MapBackground({
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setClearColor(0x000000, 0);
-    renderer.localClippingEnabled = true; // マテリアル単位クリップ面（PiP 俯瞰モード用）
     container.appendChild(renderer.domElement);
 
     // ENU（x=東, y=北, z=上）→ three.js Y-up 変換用グループ
@@ -201,67 +188,6 @@ export default function MapBackground({
     const AERIAL_ELEV = Math.asin(AERIAL_H / AERIAL_R);
     // サブパネル（PiP）用カメラ: 「現在の表示モードと逆」の視点を描画
     const pipCam = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 5000);
-    // PiP 俯瞰モード: 視野扇（円扇形）＋ ウェッジクリップ平面（無効時 constant=巨大値）
-    const clipPlaneA = new THREE.Plane(new THREE.Vector3(0, 0, 1), 1e9);
-    const clipPlaneB = new THREE.Plane(new THREE.Vector3(0, 0, -1), 1e9);
-    const lineMats = []; // 線系レイヤー（路線/道路/アウトライン）の二階調線色用
-    const grayLineObjs = new Map(); // 灰色線のオブジェクト → 元マテリアル（PiP 俯瞰パス2: 白色マテリアルへ交換して扇内を消す）
-    // 背景と同じ色（白）の白色ラインマテリアル: 視野扇内部で線色を消すため
-    const whiteLineMat = new THREE.LineBasicMaterial({ color: 0xffffff, depthWrite: false });
-    const whiteMeshMat = new THREE.MeshBasicMaterial({
-      color: 0xffffff, polygonOffset: true, polygonOffsetFactor: 0.5, polygonOffsetUnits: 0.5, depthWrite: false,
-    });
-    whiteLineMat.clippingPlanes = [clipPlaneA, clipPlaneB];
-    whiteMeshMat.clippingPlanes = [clipPlaneA, clipPlaneB];
-    let fanMesh = null;
-    let fanEdge = null;
-
-    // 視野扇: 原点中心・中心線 = +Z 方向（heading で回す）、半径 50m
-    {
-      const segs = 24;
-      const fanPos = [0, 0, 0];
-      const ringPos = [];
-      const fanIdx = [];
-      for (let i = 0; i <= segs; i++) {
-        const a = -PI_FAN_HALF_ANGLE + (2 * PI_FAN_HALF_ANGLE * i) / segs;
-        const x = Math.sin(a) * PI_AERIAL_RADIUS;
-        const z = Math.cos(a) * PI_AERIAL_RADIUS;
-        fanPos.push(x, 0, z);
-        ringPos.push(x, 0, z);
-      }
-      for (let i = 0; i < segs; i++) fanIdx.push(0, i + 1, i + 2);
-      const fanGeo = new THREE.BufferGeometry();
-      fanGeo.setAttribute('position', new THREE.Float32BufferAttribute(fanPos, 3));
-      fanGeo.setIndex(fanIdx);
-      fanMesh = new THREE.Mesh(
-        fanGeo,
-        new THREE.MeshBasicMaterial({
-          color: ROUTE_COLOR,
-          transparent: true,
-          opacity: 0.1,
-          side: THREE.DoubleSide,
-          depthWrite: false,
-        }),
-      );
-      fanMesh.renderOrder = 11;
-      fanMesh.visible = false;
-      scene.add(fanMesh);
-
-      const edgeGeo = new THREE.BufferGeometry();
-      edgeGeo.setAttribute('position', new THREE.Float32BufferAttribute(ringPos, 3));
-      fanEdge = new THREE.Line(
-        edgeGeo,
-        new THREE.LineBasicMaterial({
-          color: ROUTE_COLOR,
-          transparent: true,
-          opacity: 0.5,
-          depthWrite: false,
-        }),
-      );
-      fanEdge.renderOrder = 12;
-      fanEdge.visible = false;
-      scene.add(fanEdge);
-    }
     const keys = new Set();
     let lastViewpoint = null;
     const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -280,28 +206,6 @@ export default function MapBackground({
       const dir = routeCurve.getTangentAt(t);
       focus.x = pos.x; focus.y = pos.y; focus.z = pos.z;
       heading = Math.atan2(dir.x, dir.z);
-    }
-
-    // ---------- PiP 俯瞰モード用ヘルパー ----------
-    // クリップ平面を無効化（constant を巨大値にすると全点が通過する）
-    function setClipDisabled() {
-      clipPlaneA.constant = 1e9;
-      clipPlaneB.constant = 1e9;
-    }
-    // 歩行点 o において heading h 中心・±PI_FAN_HALF_ANGLE の視野扇（ウェッジ）を形成する 2 平面を設定
-    function setWedgePlanes(o, h) {
-      const t = PI_FAN_HALF_ANGLE;
-      clipPlaneA.normal.set(Math.cos(h - t), 0, -Math.sin(h - t));
-      clipPlaneA.constant = -(clipPlaneA.normal.x * o.x + clipPlaneA.normal.z * o.z);
-      clipPlaneB.normal.set(-Math.cos(h + t), 0, Math.sin(h + t));
-      clipPlaneB.constant = -(clipPlaneB.normal.x * o.x + clipPlaneB.normal.z * o.z);
-    }
-    // 線系レイヤーの不透明度レベルを設定（PiP 俯瞰モード: 視野扇の内外で二階調線色）
-    // 'out' = 視野扇外の線（通常の線色より薄く）/ それ以外 = 基本
-    function setLineMatsLevel(level) {
-      for (const e of lineMats) {
-        e.mat.opacity = level === 'out' ? e.dim : e.opacity;
-      }
     }
 
     // stationId / direction に応じてルートを再構築
@@ -434,11 +338,6 @@ export default function MapBackground({
                         transparent: isRail,
                         opacity: isRail ? RAIL_LINE_OPACITY : 1.0,
                       });
-                      if (isRail) {
-                        o.material.clippingPlanes = [clipPlaneA, clipPlaneB];
-                        lineMats.push(makeLineEntry(o.material, RAIL_LINE_OPACITY));
-                        grayLineObjs.set(o, o.material);
-                      }
                       old.dispose();
                     } else if (o.isLine) {
                       // 道路ネットワーク（LINES プリミティブ）: 非発光の半透明ライン（文字色程度に薄め）
@@ -449,9 +348,6 @@ export default function MapBackground({
                         opacity: ROAD_LINE_OPACITY,
                         depthWrite: false,
                       });
-                      o.material.clippingPlanes = [clipPlaneA, clipPlaneB];
-                      lineMats.push(makeLineEntry(o.material, ROAD_LINE_OPACITY));
-                      grayLineObjs.set(o, o.material);
                       old.dispose();
                     }
                   });
@@ -601,47 +497,10 @@ export default function MapBackground({
           renderer.setScissor(px, py, pw, ph);
           renderer.setScissorTest(true);
 
-          if (isPipAerial) {
-            // 俯瞰 PiP: 扇内 = 背景色（線を見せない）/ 扇外 = 薄い線色
-            // オレンジルーツューブはクリップ・減光なしで常に描画。扇型自体は非表示。
-            if (routeLine) routeLine.visible = true;
-
-            // パス1: クリップ無効 + 扇外レベル（薄い線色）で全体を描画
-            setClipDisabled();
-            setLineMatsLevel('out');
-            renderer.render(scene, pipCam);
-
-            // パス2: 視野扇（ウェッジ）内部の灰色線を「背景と同じ白色」で再描画して消す。
-            // 不透明メッシュ（地形・建物等）がパス1の結果を上書きするのを防ぐため、
-            // 線系以外の可視オブジェクトを一時的に非表示にして、線系のみを再描画する。
-            setWedgePlanes(routePos, heading); // クリップ = 扇の内側のみ
-            const hiddenForPass2 = [];
-            scene.traverse((obj) => {
-              if ((obj.isMesh || obj.isLine || obj.isPoints) && obj.visible) {
-                if (!grayLineObjs.has(obj)) {
-                  hiddenForPass2.push(obj);
-                  obj.visible = false;
-                } else {
-                  obj.material = obj.isMesh ? whiteMeshMat : whiteLineMat;
-                }
-              }
-            });
-
-            renderer.autoClearColor = false;
-            renderer.autoClearDepth = false;
-            renderer.render(scene, pipCam);
-            renderer.autoClearColor = true;
-            renderer.autoClearDepth = true;
-
-            for (const obj of hiddenForPass2) obj.visible = true;
-            for (const [obj, mat] of grayLineObjs) obj.material = mat; // 元マテリアル復元
-            setLineMatsLevel('base'); // メインビュー用の基本不透明度へ復元
-            setClipDisabled();
-
-            if (routeLine) routeLine.visible = false;
-          } else {
-            renderer.render(scene, pipCam);
-          }
+          // PiP 俯瞰: 視界内は塗りつぶさず、道路・建物アウトライン等は通常の線色で描画。オレンジルーツューブも表示。
+          if (isPipAerial && routeLine) routeLine.visible = true;
+          renderer.render(scene, pipCam);
+          if (isPipAerial && routeLine) routeLine.visible = false;
           renderer.setScissorTest(false);
         }
       }
