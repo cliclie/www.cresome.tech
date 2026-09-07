@@ -57,7 +57,7 @@ const AERIAL_TILT = 0.6;    // 俯瞰視点の前方オフセット倍率
 const PI_AERIAL_RADIUS = 50; // 表示半径 (m)
 const PI_AERIAL_H = PI_AERIAL_RADIUS / Math.tan(THREE.MathUtils.degToRad(30)); // カメラ高さ（60° FOV で半径 50m）
 const PI_FAN_HALF_ANGLE = THREE.MathUtils.degToRad(30); // 視野扇の半角（= カメラ縦 FOV の半分）
-const PI_LINE_OUT = 0.75; // PiP 俯瞰: 視界外（扇外）の線不透明度係数（通常の線色より薄く）
+const PI_LINE_OUT = 0.30; // PiP 俯瞰: 視界外（扇外）の線不透明度係数（通常の線色より薄く）
 
 // 線系レイヤーの不透明度エントリ生成（PiP 俯瞰モードの二階調線色用）
 // opacity = 通常の線色 / dim = 視野扇外（通常の線色より薄く）。扇内はクリップで描画しない＝背景色
