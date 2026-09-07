@@ -16,7 +16,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
  *
  * サブパネル（PiP）: 画面下部の小窓に「現在の表示モードと逆」の視点を描画
  * - PiP = 歩行: 眼高の歩行視点（ルートチューブは描画しない）
- * - PiP = 俯瞰: 歩行点の周囲 50m を真上から表示。視界内（歩行点の前方 ±30° セクタ）は背景地図色そのまま、視界外は背景地図色より淡く（不透明度 0.4）。オレンジルーツューブは常時通常色で表示
+ * - PiP = 俯瞰: 歩行点の周囲 50m を真上から表示。視界内（歩行点の前方 ±30° セクタ）は背景地図色そのまま、視界外は背景地図色を白へ 60% 混合した淡色（= 白背景上での不透明度 0.4 と等価の塗り色）。オレンジルーツューブは常時通常色で表示
  *
  * マウス / キーボードでのカメラ操作（両視点共通）:
  * - ドラッグ: 視点回転 / 右ドラッグ or Shift+ドラッグ: パン
@@ -56,7 +56,7 @@ const AERIAL_TILT = 0.6;    // 俯瞰視点の前方オフセット倍率
 // PiP（俯瞰モード）: 歩行点の周囲 50m を真上から表示
 const PI_AERIAL_RADIUS = 50; // 表示半径 (m)
 const PI_AERIAL_H = PI_AERIAL_RADIUS / Math.tan(THREE.MathUtils.degToRad(30)); // カメラ高さ（60° FOV で半径 50m）
-// PiP 俯瞰: 視界内（前方 ±30° セクタ）は背景地図色そのまま、視界外はこの不透明度で描画（背景地図色より淡く）
+// PiP 俯瞰: 視界内（前方 ±30° セクタ）は背景地図色そのまま、視界外はこの比率で白へ混合（白背景上での不透明度 0.4 と等価）
 const PI_OUT_OPACITY = 0.4;
 // PiP 俯瞰: 視界内セクタの半角（±30°、中心軸 = 進行方向 heading）
 const PI_FOV_HALF = THREE.MathUtils.degToRad(30);
@@ -360,11 +360,25 @@ export default function MapBackground({
                     } else {
                       return;
                     }
-                    // PiP 俯瞰用: 視界外減光のツインマテリアル（背景地図色 × 0.4）を保持。PiP 俯瞰描画時に毎フレーム切替
+                    // PiP 俯瞰用: 視界外減光のツインマテリアルを保持。PiP 俯瞰描画時に毎フレーム切替
                     o.userData.pipBaseMat = o.material;
                     const faded = o.material.clone();
-                    faded.transparent = true;
-                    faded.opacity = PI_OUT_OPACITY;
+                    if (o.isMesh) {
+                      // メッシュ: 半透明 alpha では建物の白塗り潰しが背景に透けて見えるため、
+                      // 各頂点色を白へ 60% 混合した不透明な塗り色で描画（= 背景地図色 × 0.4 の見た目）
+                      faded.transparent = false;
+                      faded.opacity = 1.0;
+                      faded.onBeforeCompile = (shader) => {
+                        shader.fragmentShader = shader.fragmentShader.replace(
+                          '#include <color_fragment>',
+                          `#include <color_fragment>\n\t// PiP 俯瞰・視界外減光: 背景地図色 × ${PI_OUT_OPACITY}（白へ混合）\n\tdiffuseColor.rgb = mix( vec3( 1.0 ), diffuseColor.rgb, ${PI_OUT_OPACITY} );`,
+                        );
+                      };
+                    } else {
+                      // ライン: 半透明のまま（元が depthWrite:false で透明パスに描画される）
+                      faded.transparent = true;
+                      faded.opacity = PI_OUT_OPACITY;
+                    }
                     o.userData.pipFadedMat = faded;
                     pipFadeObjs.push(o);
                   });
@@ -515,16 +529,28 @@ export default function MapBackground({
           renderer.setScissorTest(true);
 
           if (isPipAerial) {
-            // PiP 俯瞰: 視界内（前方 ±30° セクタ）= 背景地図色そのまま、視界外 = 0.4 減光。
-            // セクタの補集合は非凸のため単一パスのクリップでは表現できない → 「全窓減光 → 視界内再描画」の 2 パス。
-            if (routeLine) routeLine.visible = true; // オレンジルートは常時表示（通常色・減光対象外）
+            // PiP 俯瞰: 視界内（前方 ±30° セクタ）= 背景地図色そのまま、視界外 = 白へ混合した塗り色。
+            // セクタの補集合は非凸のため単一パスのクリップでは表現できない →
+            // 「全窓減光 → オレンジルート上書き → 視界内再描画」の 3 パス。
             // パス 1（視界外レベル）: 全マップレイヤーを減光マテリアルで全窓描画
+            if (routeLine) routeLine.visible = false;
             for (const o of pipFadeObjs) o.material = o.userData.pipFadedMat;
             renderer.render(scene, pipCam);
-            // パス 2（視界内復描）: 通常マテリアルに戻し、クリップ平面（歩行点を通る縦平面 2 枚）で
+            // パス 2（オレンジルート上書き）: ルートのみを描画（通常色・減光対象外・視界内外を問わず常時表示）。
+            // 一時的に depthWrite を ON にし、ルートが深度を書き込むことで、
+            // パス 3 の視界内再描画がルートのピクセルを上書きしないようにする。
+            world.visible = false;
+            if (routeLine) {
+              routeLine.visible = true;
+              routeLine.material.depthWrite = true;
+            }
+            renderer.autoClear = false;
+            renderer.render(scene, pipCam);
+            if (routeLine) routeLine.material.depthWrite = false;
+            world.visible = true;
+            // パス 3（視界内復描）: 通常マテリアルに戻し、クリップ平面（歩行点を通る縦平面 2 枚）で
             // 前方 ±30° セクタの内側のみを残して再描画 → 視界内だけ背景地図色（フルカラー）で上書き
             for (const o of pipFadeObjs) o.material = o.userData.pipBaseMat;
-            if (routeLine) routeLine.visible = false; // 両パスでの二重ブレンド（視界内で色が濃くなる）を回避
             // セクタ境界の 2 平面: 保持側 = セクタ内（符号付き距離 ≥ 0）
             const a1 = heading - PI_FOV_HALF;
             pipWedgePlanes[0].normal.set(Math.cos(a1), 0, -Math.sin(a1));

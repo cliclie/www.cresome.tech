@@ -17,6 +17,11 @@ await page.waitForFunction(
 ).catch(() => console.log('WARN: 読み込みインジケータ消滅を待ち切れ'));
 await new Promise(r => setTimeout(r, 3000));
 const pip = await page.$('.map-pip');
-if (pip) { await pip.screenshot({ path: OUT }); console.log('OK -> ' + OUT); }
-else { console.log('ERROR: .map-pip not found'); }
+if (pip) {
+  await pip.screenshot({ path: OUT });
+  console.log('OK -> ' + OUT);
+  await new Promise(r => setTimeout(r, 6000));
+  await pip.screenshot({ path: OUT.replace('.png', '_2.png') });
+  console.log('OK -> ' + OUT.replace('.png', '_2.png'));
+} else { console.log('ERROR: .map-pip not found'); }
 await b.close();
