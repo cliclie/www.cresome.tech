@@ -16,7 +16,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
  *
  * サブパネル（PiP）: 画面下部の小窓に「現在の表示モードと逆」の視点を描画
  * - PiP = 歩行: 眼高の歩行視点（ルートチューブは描画しない）
- * - PiP = 俯瞰: 歩行点の周囲 50m を真上から表示。視界内は塗りつぶさず、道路・建物アウトライン等の線は通常の線色で描画。オレンジルーツューブも表示
+ * - PiP = 俯瞰: 歩行点の周囲 50m を真上から表示。視界内（歩行点の前方 ±30° セクタ）は背景地図色そのまま、視界外は背景地図色より淡く（不透明度 0.4）。オレンジルーツューブは常時通常色で表示
  *
  * マウス / キーボードでのカメラ操作（両視点共通）:
  * - ドラッグ: 視点回転 / 右ドラッグ or Shift+ドラッグ: パン
@@ -56,6 +56,10 @@ const AERIAL_TILT = 0.6;    // 俯瞰視点の前方オフセット倍率
 // PiP（俯瞰モード）: 歩行点の周囲 50m を真上から表示
 const PI_AERIAL_RADIUS = 50; // 表示半径 (m)
 const PI_AERIAL_H = PI_AERIAL_RADIUS / Math.tan(THREE.MathUtils.degToRad(30)); // カメラ高さ（60° FOV で半径 50m）
+// PiP 俯瞰: 視界内（前方 ±30° セクタ）は背景地図色そのまま、視界外はこの不透明度で描画（背景地図色より淡く）
+const PI_OUT_OPACITY = 0.4;
+// PiP 俯瞰: 視界内セクタの半角（±30°、中心軸 = 進行方向 heading）
+const PI_FOV_HALF = THREE.MathUtils.degToRad(30);
 
 // ============================================================
 // 座標変換: ENU [x, y, z] → three.js Vector3
@@ -176,6 +180,10 @@ export default function MapBackground({
     let routeLine = null;
     let routeFlat = null; // 平面化ルート（俯瞰・一人称用）
     let movingDot = null;
+    // PiP 俯瞰: マテリアル切替対象のマップオブジェクト（userData.pipBaseMat = 通常 / pipFadedMat = 減光 0.4）
+    const pipFadeObjs = [];
+    // PiP 俯瞰: 視界内（前方 ±30° セクタ）クリップ平面 — 歩行点を通る縦平面 2 枚、毎フレーム更新
+    const pipWedgePlanes = [new THREE.Plane(), new THREE.Plane()];
 
     // ---------- カメラ状態 ----------
     // ルートのフォーカスポイント（平滑化済み）とヘディング（平滑化済み）
@@ -349,7 +357,16 @@ export default function MapBackground({
                         depthWrite: false,
                       });
                       old.dispose();
+                    } else {
+                      return;
                     }
+                    // PiP 俯瞰用: 視界外減光のツインマテリアル（背景地図色 × 0.4）を保持。PiP 俯瞰描画時に毎フレーム切替
+                    o.userData.pipBaseMat = o.material;
+                    const faded = o.material.clone();
+                    faded.transparent = true;
+                    faded.opacity = PI_OUT_OPACITY;
+                    o.userData.pipFadedMat = faded;
+                    pipFadeObjs.push(o);
                   });
                   world.add(gltf.scene);
                   resolve();
@@ -486,7 +503,7 @@ export default function MapBackground({
               routePos.z + pDirZ * 50,
             );
           } else {
-            // PiP = 俯瞰: 歩行点の周囲 200m を真上から（北 = 画面上方向）
+            // PiP = 俯瞰: 歩行点の周囲 50m を真上から（北 = 画面上方向）
             pipCam.up.set(0, 0, -1);
             pipCam.position.set(routePos.x, routePos.y + PI_AERIAL_H, routePos.z);
             pipCam.lookAt(routePos.x, routePos.y, routePos.z);
@@ -497,9 +514,36 @@ export default function MapBackground({
           renderer.setScissor(px, py, pw, ph);
           renderer.setScissorTest(true);
 
-          // PiP 俯瞰: 視界内は塗りつぶさず、道路・建物アウトライン等は通常の線色で描画。オレンジルーツューブも表示。
-          if (isPipAerial && routeLine) routeLine.visible = true;
-          renderer.render(scene, pipCam);
+          if (isPipAerial) {
+            // PiP 俯瞰: 視界内（前方 ±30° セクタ）= 背景地図色そのまま、視界外 = 0.4 減光。
+            // セクタの補集合は非凸のため単一パスのクリップでは表現できない → 「全窓減光 → 視界内再描画」の 2 パス。
+            if (routeLine) routeLine.visible = true; // オレンジルートは常時表示（通常色・減光対象外）
+            // パス 1（視界外レベル）: 全マップレイヤーを減光マテリアルで全窓描画
+            for (const o of pipFadeObjs) o.material = o.userData.pipFadedMat;
+            renderer.render(scene, pipCam);
+            // パス 2（視界内復描）: 通常マテリアルに戻し、クリップ平面（歩行点を通る縦平面 2 枚）で
+            // 前方 ±30° セクタの内側のみを残して再描画 → 視界内だけ背景地図色（フルカラー）で上書き
+            for (const o of pipFadeObjs) o.material = o.userData.pipBaseMat;
+            if (routeLine) routeLine.visible = false; // 両パスでの二重ブレンド（視界内で色が濃くなる）を回避
+            // セクタ境界の 2 平面: 保持側 = セクタ内（符号付き距離 ≥ 0）
+            const a1 = heading - PI_FOV_HALF;
+            pipWedgePlanes[0].normal.set(Math.cos(a1), 0, -Math.sin(a1));
+            pipWedgePlanes[0].constant =
+              -(pipWedgePlanes[0].normal.x * routePos.x +
+                pipWedgePlanes[0].normal.z * routePos.z);
+            const a2 = heading + PI_FOV_HALF;
+            pipWedgePlanes[1].normal.set(-Math.cos(a2), 0, Math.sin(a2));
+            pipWedgePlanes[1].constant =
+              -(pipWedgePlanes[1].normal.x * routePos.x +
+                pipWedgePlanes[1].normal.z * routePos.z);
+            renderer.autoClear = false;
+            renderer.clippingPlanes = pipWedgePlanes;
+            renderer.render(scene, pipCam);
+            renderer.clippingPlanes = []; // three の WebGLClipping.init は null を許容しないため空配列で無効化
+            renderer.autoClear = true;
+          } else {
+            renderer.render(scene, pipCam);
+          }
           if (isPipAerial && routeLine) routeLine.visible = false;
           renderer.setScissorTest(false);
         }
@@ -655,13 +699,16 @@ export default function MapBackground({
         movingDot.geometry.dispose();
         movingDot.material.dispose();
       }
-      // GLB レイヤーのリソース破棄（メッシュ・ライン両方）
+      // GLB レイヤーのリソース破棄（メッシュ・ライン両方）＋ PiP 俯瞰用の減光ツインマテリアル
       world.traverse((o) => {
         if (!o.isMesh && !o.isLine) return;
         if (o.geometry) o.geometry.dispose();
         const m = o.material;
         if (Array.isArray(m)) m.forEach((mm) => mm.dispose());
         else if (m) m.dispose();
+        const b = o.userData.pipBaseMat;
+        if (b && b !== m) b.dispose();
+        if (o.userData.pipFadedMat) o.userData.pipFadedMat.dispose();
       });
       renderer.dispose();
       if (renderer.domElement.parentNode) {
