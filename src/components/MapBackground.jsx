@@ -57,7 +57,7 @@ const AERIAL_TILT = 0.6;    // 俯瞰視点の前方オフセット倍率
 const PI_AERIAL_RADIUS = 50; // 表示半径 (m)
 const PI_AERIAL_H = PI_AERIAL_RADIUS / Math.tan(THREE.MathUtils.degToRad(30)); // カメラ高さ（60° FOV で半径 50m）
 // PiP 俯瞰: 視界内（前方 ±30° セクタ）は背景地図色そのまま、視界外はこの比率で白へ混合（白背景上での不透明度 0.4 と等価）
-const PI_OUT_OPACITY = 0.4;
+const PI_OUT_OPACITY = 0.16;
 // PiP 俯瞰: 視界内セクタの半角（±30°、中心軸 = 進行方向 heading）
 const PI_FOV_HALF = THREE.MathUtils.degToRad(30);
 
