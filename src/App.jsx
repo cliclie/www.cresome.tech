@@ -116,9 +116,13 @@ export default function App() {
     setMapConfig((prev) => ({ ...prev, ...updates }));
   };
 
-  // 停止（始点に戻る）: トークンを増やすたびに MapBackground がルートをリセット
-  const [mapResetToken, setMapResetToken] = useState(0);
-  const resetMapRoute = () => setMapResetToken((n) => n + 1);
+  // 停止（始点へリセット）: MapBackground が公開した seekTo を呼ぶ
+  const mapApiRef = useRef(null);
+
+  // ルート進行度（メートル）: スライダー表示用（MapBackground が整数m変化時に報告）
+  const [mapProgress, setMapProgress] = useState({ m: 0, len: 0 });
+  // 開始カウントダウン（3/2/1、進行中は null）: 歩行視点側のオーバーレイ表示用
+  const [mapCountdown, setMapCountdown] = useState(null);
 
   // サブパネル（PiP）ウィンドウの ref（MapBackground が描画）
   const pipRef = useRef(null);
@@ -136,7 +140,9 @@ export default function App() {
           direction={mapConfig.direction}
           speed={mapConfig.speed}
           playing={mapConfig.playing}
-          resetToken={mapResetToken}
+          apiRef={mapApiRef}
+          onProgress={(m, len) => setMapProgress({ m, len })}
+          onCountdown={(cd) => setMapCountdown(cd)}
           pipRef={pipRef}
         />
       )}
@@ -158,26 +164,50 @@ export default function App() {
 
       <main className="main">
         {bgMode === 'map' && mapConfig && (
-          <div className="map-bottom">
-            <MapControls
-              stationId={mapConfig.stationId}
-              onStationChange={(id) => updateMapConfig({ stationId: id })}
-              viewpoint={mapConfig.viewpoint}
-              onViewpointChange={(v) => updateMapConfig({ viewpoint: v })}
-              direction={mapConfig.direction}
-              onDirectionChange={(d) => updateMapConfig({ direction: d })}
-              speed={mapConfig.speed}
-              onSpeedChange={(s) => updateMapConfig({ speed: s })}
-              playing={mapConfig.playing}
-              onPlayingChange={(p) => updateMapConfig({ playing: p })}
-              onResetRoute={resetMapRoute}
-            />
-            <div className="map-pip" ref={pipRef}>
-              <span className="map-pip-label">
-                {mapConfig.viewpoint === 'aerial' ? '歩行' : '俯瞰'}
-              </span>
+          <>
+            {mapConfig.viewpoint === 'walking' && mapCountdown != null && (
+              <div className="map-countdown" key={mapCountdown} aria-hidden="true">
+                {mapCountdown}
+              </div>
+            )}
+            <div className="map-bottom">
+              <MapControls
+                stationId={mapConfig.stationId}
+                onStationChange={(id) => updateMapConfig({ stationId: id })}
+                viewpoint={mapConfig.viewpoint}
+                onViewpointChange={(v) => updateMapConfig({ viewpoint: v })}
+                direction={mapConfig.direction}
+                onDirectionChange={(d) => updateMapConfig({ direction: d })}
+                speed={mapConfig.speed}
+                onSpeedUp={() =>
+                  updateMapConfig({ speed: Math.min(14, mapConfig.speed + 2) })
+                }
+                onSpeedDown={() =>
+                  updateMapConfig({ speed: Math.max(1.4, mapConfig.speed - 2) })
+                }
+                playing={mapConfig.playing}
+                onPlay={() => updateMapConfig({ playing: true })}
+                onPause={() => updateMapConfig({ playing: false })}
+                onStop={() => {
+                  if (mapApiRef.current) mapApiRef.current.seekTo(0);
+                  updateMapConfig({ playing: false });
+                }}
+                progressM={mapProgress.m}
+                routeLenM={mapProgress.len}
+                onScrub={(m) => mapApiRef.current?.seekTo(m)}
+              />
+              <div className="map-pip" ref={pipRef}>
+                <span className="map-pip-label">
+                  {mapConfig.viewpoint === 'aerial' ? '歩行' : '俯瞰'}
+                </span>
+                {mapConfig.viewpoint === 'aerial' && mapCountdown != null && (
+                  <span className="map-pip-countdown" key={mapCountdown} aria-hidden="true">
+                    {mapCountdown}
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
+          </>
         )}
         <div className="page-wrap">
           {PAGES.map(({ id, Component }) => (

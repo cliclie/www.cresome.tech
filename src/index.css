@@ -214,7 +214,7 @@ body {
   bottom: 16px;
   z-index: 30;
   display: flex;
-  align-items: flex-end;
+  align-items: stretch;
   gap: 12px;
 }
 .map-controls {
@@ -315,23 +315,16 @@ body {
   background: var(--accent);
   cursor: pointer;
 }
-.map-controls-slider-labels {
-  display: inline-flex;
-  gap: 8px;
-  font-size: 11px;
-  color: var(--muted);
-  letter-spacing: 0.05em;
-}
 /* ---------- サブパネル（PiP）: 「現在の表示モードの反対側」を映す小窓（操作パネルの右側） ---------- */
 .map-pip {
   position: relative;
   flex: 0 0 auto;
   width: 240px;
-  height: 168px;
   border: 1px solid var(--line);
   border-radius: 4px;
   box-shadow: 0 2px 10px -6px rgba(31, 42, 84, 0.12);
   overflow: hidden;
+  min-height: 168px;
 }
 .map-pip-label {
   position: absolute;
@@ -351,6 +344,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 .map-controls-player-btn {
   width: 32px;
@@ -370,15 +364,6 @@ body {
   color: var(--navy);
   background: rgba(31, 42, 84, 0.06);
   border-color: rgba(31, 42, 84, 0.3);
-}
-.map-controls-player-main {
-  width: 40px;
-  height: 40px;
-}
-.map-controls-player-main.paused {
-  color: var(--accent);
-  background: rgba(239, 91, 0, 0.06);
-  border-color: rgba(239, 91, 0, 0.45);
 }
 /* Icons (CSS shapes) */
 .map-controls-icon {
@@ -400,24 +385,96 @@ body {
   height: 13px;
   background: currentColor;
 }
-.map-controls-icon-rewind::before {
-  content: '';
-  width: 2px;
-  height: 11px;
+.map-controls-icon-stop {
+  display: block;
+  width: 10px;
+  height: 10px;
   background: currentColor;
-  border-radius: 1px;
+  border-radius: 2px;
 }
-.map-controls-icon-rewind::after {
+.map-controls-icon-ff::before,
+.map-controls-icon-ff::after {
   content: '';
-  border-right: 9px solid currentColor;
+  border-left: 7px solid currentColor;
   border-top: 5px solid transparent;
   border-bottom: 5px solid transparent;
+}
+.map-controls-icon-rw::before,
+.map-controls-icon-rw::after {
+  content: '';
+  border-right: 7px solid currentColor;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+}
+/* 再生段（一段独立） */
+.map-controls-group-row {
+  flex-basis: 100%;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  margin-top: 2px;
+}
+.map-controls-speed {
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 52px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.map-controls-slider-progress {
+  flex: 1;
+  min-width: 120px;
+  width: auto;
+}
+.map-controls-progress-label {
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 72px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 .map-controls-hint-text {
   font-size: 11px;
   line-height: 1.7;
   letter-spacing: 0.03em;
   color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ---------- カウントダウン（歩行開始前の 3→2→1） ---------- */
+@keyframes cd-pop {
+  0% { transform: scale(1.25); opacity: 0.35; }
+  40% { opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.map-countdown {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 216px;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-size: 120px;
+  font-weight: 700;
+  color: var(--accent);
+  text-shadow: 0 2px 18px rgba(255, 255, 255, 0.9);
+  animation: cd-pop 0.9s ease-out;
+}
+.map-pip-countdown {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-size: 42px;
+  font-weight: 700;
+  color: var(--accent);
+  text-shadow: 0 1px 8px rgba(255, 255, 255, 0.9);
+  animation: cd-pop 0.9s ease-out;
 }
 
 /* ---------- Background switcher (bottom of right menu) ---------- */
@@ -691,6 +748,16 @@ body {
   .map-pip {
     width: 150px;
     height: 112px;
+  }
+  .map-countdown {
+    right: 0;
+    font-size: 64px;
+  }
+  .map-pip-countdown {
+    font-size: 30px;
+  }
+  .map-controls-hint-text {
+    white-space: normal;
   }
 }
 @media (max-width: 480px) {

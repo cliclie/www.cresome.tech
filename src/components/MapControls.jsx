@@ -7,15 +7,14 @@
  * - 始点選択（7駅 / 10始点）
  * - 視点切替（歩行 / 俯瞰）（サブパネル PiP: 地図 canvas に現在の表示モードの反対側を小窓表示）
  * - 向き切替（駅→クリサム / クリサム→駅）
- * - 速度スライダー（徒歩 1.4 m/s 〜 車 14 m/s）
- * - 再生制御（音楽プレーヤー風: ▶/⏸ 中断・再開、⏮ 停止=始点へ戻る）
- * - カメラ操作ヒント（マウス / キーボード）
+ * - 再生制御（音楽プレーヤー風、一段独立）:
+ *   ▶ 再生 / ■ 停止（先頭へ）/ ⏸ 一時停止 /
+ *   ⏩ 早送り（速度+2 m/s）/ ⏪ 早戻し（速度-2 m/s）/
+ *   スライダー = 移動量（メートル）のシーク
+ * - カメラ操作ヒント（1行）
  */
 
 import { STATION_GROUPS } from '../data/stationPoints';
-
-const SPEED_MIN = 1.4; // 徒歩
-const SPEED_MAX = 14;  // 車
 
 export default function MapControls({
   stationId,
@@ -25,10 +24,15 @@ export default function MapControls({
   direction,
   onDirectionChange,
   speed,
-  onSpeedChange,
-  playing = true,
-  onPlayingChange,
-  onResetRoute,
+  onSpeedUp,
+  onSpeedDown,
+  playing,
+  onPlay,
+  onPause,
+  onStop,
+  progressM = 0,
+  routeLenM = 0,
+  onScrub,
 }) {
   return (
     <div className="map-controls">
@@ -106,63 +110,77 @@ export default function MapControls({
         </div>
       </div>
 
-      <div className="map-controls-group">
-        <span className="map-controls-sublabel">
-          速度（{speed.toFixed(1)} m/s）
+      <div className="map-controls-group map-controls-hint">
+        <span className="map-controls-sublabel">カメラ操作</span>
+        <span className="map-controls-hint-text">
+          ドラッグ: 視点回転 / ホイール: ズーム / 右ドラッグ: パン /
+          WASD・矢印: 回転 / Q・E: 上下 / R: リセット
         </span>
-        <input
-          type="range"
-          className="map-controls-slider"
-          min={SPEED_MIN}
-          max={SPEED_MAX}
-          step={0.1}
-          value={speed}
-          onChange={(e) => onSpeedChange(parseFloat(e.target.value))}
-        />
-        <div className="map-controls-slider-labels">
-          <span>徒歩</span>
-          <span>車</span>
-        </div>
       </div>
 
-      <div className="map-controls-group">
+      <div className="map-controls-group map-controls-group-row">
         <span className="map-controls-sublabel">再生</span>
         <div className="map-controls-player">
           <button
             type="button"
             className="map-controls-player-btn"
-            title="停止（最初へ）"
-            aria-label="停止（最初へ）"
-            onClick={onResetRoute}
+            title="再生"
+            aria-label="再生"
+            onClick={onPlay}
           >
-            <span className="map-controls-icon map-controls-icon-rewind" />
+            <span className="map-controls-icon map-controls-icon-play" />
           </button>
           <button
             type="button"
-            className={
-              'map-controls-player-btn map-controls-player-main' +
-              (playing ? '' : ' paused')
-            }
-            title={playing ? '中断' : '再開（再生）'}
-            aria-label={playing ? '中断' : '再開（再生）'}
-            onClick={() => onPlayingChange(!playing)}
+            className="map-controls-player-btn"
+            title="停止（先頭へ戻る）"
+            aria-label="停止（先頭へ戻る）"
+            onClick={onStop}
           >
-            <span
-              className={
-                'map-controls-icon ' +
-                (playing ? 'map-controls-icon-pause' : 'map-controls-icon-play')
-              }
-            />
+            <span className="map-controls-icon map-controls-icon-stop" />
           </button>
-        </div>
-      </div>
-
-      <div className="map-controls-group map-controls-hint">
-        <span className="map-controls-sublabel">カメラ操作</span>
-        <div className="map-controls-hint-text">
-          ドラッグ: 視点回転 / ホイール: ズーム / 右ドラッグ: カメラパン
-          <br />
-          WASD・矢印: 視点回転 / Q/E: 上下移動 / R: リセット
+          <button
+            type="button"
+            className="map-controls-player-btn"
+            title="一時停止"
+            aria-label="一時停止"
+            onClick={onPause}
+          >
+            <span className="map-controls-icon map-controls-icon-pause" />
+          </button>
+          <button
+            type="button"
+            className="map-controls-player-btn"
+            title="早送り（速度 +2 m/s）"
+            aria-label="早送り（速度を上げる）"
+            onClick={onSpeedUp}
+          >
+            <span className="map-controls-icon map-controls-icon-ff" />
+          </button>
+          <button
+            type="button"
+            className="map-controls-player-btn"
+            title="早戻し（速度 -2 m/s）"
+            aria-label="早戻し（速度を下げる）"
+            onClick={onSpeedDown}
+          >
+            <span className="map-controls-icon map-controls-icon-rw" />
+          </button>
+          <span className="map-controls-speed">{speed.toFixed(1)} m/s</span>
+          <input
+            type="range"
+            className="map-controls-slider map-controls-slider-progress"
+            min={0}
+            max={Math.max(routeLenM, 1)}
+            step={1}
+            value={Math.min(progressM, routeLenM || 0)}
+            disabled={routeLenM <= 0}
+            onChange={(e) => onScrub(parseInt(e.target.value, 10))}
+            aria-label="移動量（メートル）"
+          />
+          <span className="map-controls-progress-label">
+            {routeLenM > 0 ? `${progressM} / ${routeLenM} m` : '--'}
+          </span>
         </div>
       </div>
     </div>

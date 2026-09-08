@@ -16,7 +16,12 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
  *
  * サブパネル（PiP）: 画面下部の小窓に「現在の表示モードと逆」の視点を描画
  * - PiP = 歩行: 眼高の歩行視点（ルートチューブは描画しない）
- * - PiP = 俯瞰: 歩行点の周囲 50m を真上から表示。視界内（歩行点の前方 ±30° セクタ）は背景地図色そのまま、視界外は背景地図色を白へ 60% 混合した淡色（= 白背景上での不透明度 0.4 と等価の塗り色）。オレンジルーツューブは常時通常色で表示
+ * - PiP = 俯瞰: 歩行点の周囲 50m を真上から表示。視界内（歩行点の前方 ±30° セクタ）は背景地図色そのまま、視界外は背景地図色を白へ 60% 混合した淡色。オレンジ経路チューブは常時通常色で表示
+ * 路線（lines レイヤーの灰色チューブ: 電車などの交通機関）は俯瞰視点のみ表示（歩行視点ではメイン・PiP とも非表示）
+ *
+ * ルートアニメーション（フェーズ状態機械）:
+ * countdown(3s) → walking → arrive(3s, 目標を向き少し見上げる) → fadeOut → 始点スナップ → fadeIn → countdown …
+ * 一時停止(playing=false)中は全フェーズがフリーズ。
  *
  * マウス / キーボードでのカメラ操作（両視点共通）:
  * - ドラッグ: 視点回転 / 右ドラッグ or Shift+ドラッグ: パン
@@ -60,6 +65,11 @@ const PI_AERIAL_H = PI_AERIAL_RADIUS / Math.tan(THREE.MathUtils.degToRad(30)); /
 const PI_OUT_OPACITY = 0.16;
 // PiP 俯瞰: 視界内セクタの半角（±30°、中心軸 = 進行方向 heading）
 const PI_FOV_HALF = THREE.MathUtils.degToRad(30);
+// フェーズ状態機械の定数
+const COUNTDOWN_DUR = 3;   // 開始カウントダウン（秒）
+const ARRIVE_DUR = 3;      // 到着後停止（秒）
+const FADE_DUR = 0.45;     // フェードアウト/イン（秒）
+const ARRIVE_PITCH_LIFT = 0.15; // 到着時の「少し見上げる」pitch 加算 (rad)
 
 // ============================================================
 // 座標変換: ENU [x, y, z] → three.js Vector3
@@ -129,13 +139,17 @@ export default function MapBackground({
   direction = 1,
   speed = 5,
   playing = true,
-  resetToken = 0,
+  apiRef = null,
+  onProgress = null,
+  onCountdown = null,
   pipRef = null,
 }) {
   const containerRef = useRef(null);
   const threeRef = useRef(null);
   const configRef = useRef({ stationId, viewpoint, direction, speed, playing });
   configRef.current = { stationId, viewpoint, direction, speed, playing };
+  const cbRef = useRef({ onProgress, onCountdown });
+  cbRef.current = { onProgress, onCountdown };
 
   useEffect(() => {
     const container = containerRef.current;
@@ -171,9 +185,19 @@ export default function MapBackground({
 
     // ---------- アニメーション状態 ----------
     const anim = { t: 0, lastTime: 0 };
+    // フェーズ状態機械: countdown → walking → arrive → fadeOut → fadeIn → countdown …
+    let phase = 'countdown';
+    let phaseT = COUNTDOWN_DUR; // 現フェーズの残り時間（秒）
+    let arriveBlend = 0;        // 到着時の「少し見上げる」イージング（0→1）
+    let canvasOpacity = 1;      // フェード用 canvas 不透明度
+    let lastReportedM = -1;     // 直前に報告した位置（メートル）
+    let lastReportedCd = -1;    // 直前に報告したカウントダウン値
+    let arriveHeading = 0;      // 到着時に「目標を向く」方位（ルートの終端 → 目標マーク重心）
 
     // ルート状態（init で routes.json を読み込み後に構築）
     const routesDataRef = { current: null };
+    let cresomePos3 = null;            // クリサム社屋の重心（three.js 座標、manifest）
+    const stationPosByName = {};       // 駅名 → 駅出口の重心（three.js 座標、manifest）
     let routePts3 = [];  // three.js 座標の配列
     let routeCurve = null; // ルートの丸め CurvePath（ドット位置・ヘディング用）
     let routeLen = 0;
@@ -184,6 +208,9 @@ export default function MapBackground({
     const pipFadeObjs = [];
     // PiP 俯瞰: 視界内（前方 ±30° セクタ）クリップ平面 — 歩行点を通る縦平面 2 枚、毎フレーム更新
     const pipWedgePlanes = [new THREE.Plane(), new THREE.Plane()];
+    // 路線（lines レイヤー・灰色チューブ: 電車などの交通機関）の描画オブジェクト群。
+    // 歩行視点（メイン・PiP 双方）では非表示にし、俯瞰視点のみ表示する。
+    const railObjs = [];
 
     // ---------- カメラ状態 ----------
     // ルートのフォーカスポイント（平滑化済み）とヘディング（平滑化済み）
@@ -252,6 +279,19 @@ export default function MapBackground({
 
       // ルートチューブ（viewer と同様の丸め曲線 + TubeGeometry）
       routeCurve = buildRoundedCurve(routePts3, 1.0);
+      // 到着時の「目標を向く」方位: ルート終端 → 目標マーク重心（station→社ならクリサム社屋、逆にすれば駅出口）
+      {
+        const end = routeCurve.getPointAt(1);
+        const goal = cfg.direction === 1 ? cresomePos3 : stationPosByName[stationName];
+        const dx = (goal ? goal.x : end.x) - end.x;
+        const dz = (goal ? goal.z : end.z) - end.z;
+        if (Math.hypot(dx, dz) > 0.01) {
+          arriveHeading = Math.atan2(dx, dz);
+        } else {
+          const tEnd = routeCurve.getTangentAt(1);
+          arriveHeading = Math.atan2(tEnd.x, tEnd.z);
+        }
+      }
       const segs = Math.max(Math.round(routeLen / 0.5), 64);
       const tubeGeo = new THREE.TubeGeometry(routeCurve, segs, ROUTE_TUBE_RADIUS, 8, false);
       const tubeMat = new THREE.MeshBasicMaterial({
@@ -282,13 +322,40 @@ export default function MapBackground({
       scene.add(movingDot);
 
       anim.t = 0;
+      phase = 'countdown';
+      phaseT = COUNTDOWN_DUR;
+      arriveBlend = 0;
+      canvasOpacity = 1;
+      lastReportedM = -1;
+      lastReportedCd = -1;
       snapToRoute(0);
+      renderer.domElement.style.opacity = 1;
+      if (cbRef.current.onProgress) cbRef.current.onProgress(0, Math.round(routeLen));
     }
 
-    // 停止（始点に戻る）: ルート進捗をリセットしカメラを始点へ
-    function resetRoute() {
-      anim.t = 0;
-      snapToRoute(0);
+    // シーク（外部 API）: ルート上のメートル位置へジャンプ。フェーズは位置に応じて切替
+    function seekTo(meters) {
+      if (!routeLen || !routeCurve) return;
+      anim.t = clamp(meters / routeLen, 0, 1);
+      arriveBlend = 0;
+      canvasOpacity = 1;
+      renderer.domElement.style.opacity = 1;
+      if (anim.t <= 0.001) {
+        phase = 'countdown';
+        phaseT = COUNTDOWN_DUR;
+      } else if (anim.t >= 0.999) {
+        phase = 'arrive';
+        phaseT = ARRIVE_DUR;
+      } else {
+        phase = 'walking';
+      }
+      snapToRoute(anim.t);
+      const m = Math.round(anim.t * routeLen);
+      lastReportedM = m;
+      if (cbRef.current.onProgress) cbRef.current.onProgress(m, Math.round(routeLen));
+      const cd = phase === 'countdown' ? COUNTDOWN_DUR : null;
+      lastReportedCd = cd;
+      if (cbRef.current.onCountdown) cbRef.current.onCountdown(cd);
     }
 
     // キーボード: A/D・←/→ = 左右回転, W/S・↑/↓ = ピッチ, Q/E = 上下移動
@@ -317,6 +384,12 @@ export default function MapBackground({
       const manifest = await manifestRes.json();
       routesDataRef.current = await routesRes.json();
       if (disposed) return;
+
+      // 到着時の「目標を向く」用の重心位置（three.js 座標）
+      cresomePos3 = enuToV3(manifest.cresome.position);
+      for (const s of manifest.stations || []) {
+        stationPosByName[s.name] = enuToV3(s.position);
+      }
 
       // 全レイヤーを並列ロード（個別失敗でも残りは読み込む）
       await Promise.all(
@@ -381,6 +454,8 @@ export default function MapBackground({
                     }
                     o.userData.pipFadedMat = faded;
                     pipFadeObjs.push(o);
+                    // 路線レイヤー（灰色チューブ）のオブジェクトを収集（歩行視点で非表示にする用）
+                    if (layer.id === 'lines') railObjs.push(o);
                   });
                   world.add(gltf.scene);
                   resolve();
@@ -419,11 +494,53 @@ export default function MapBackground({
       let routePos = null; // 現在のルート上の位置（PiP 用）
 
       if (routeCurve) {
-        // ルート進捗（中断中は進行しない）
+        // フェーズ状態機械（一時停止中は全フェーズがフリーズ）:
+        // countdown(3s) → walking → arrive(3s: 目標を向き少し見上げる) → fadeOut → 始点スナップ → fadeIn → …
         if (cfg.playing && routeLen > 0) {
-          anim.t += (cfg.speed * dt) / routeLen;
-          if (anim.t > 1) anim.t -= 1;
+          switch (phase) {
+            case 'countdown':
+              phaseT -= dt;
+              if (phaseT <= 0) phase = 'walking';
+              break;
+            case 'walking':
+              anim.t += (cfg.speed * dt) / routeLen;
+              if (anim.t >= 1) {
+                anim.t = 1;
+                phase = 'arrive';
+                phaseT = ARRIVE_DUR;
+              }
+              break;
+            case 'arrive':
+              phaseT -= dt;
+              arriveBlend = Math.min(1, arriveBlend + dt * 2.5);
+              if (phaseT <= 0) {
+                phase = 'fadeOut';
+                phaseT = FADE_DUR;
+              }
+              break;
+            case 'fadeOut':
+              phaseT -= dt;
+              canvasOpacity = Math.max(0, phaseT / FADE_DUR);
+              if (phaseT <= 0) {
+                anim.t = 0;
+                snapToRoute(0);
+                arriveBlend = 0;
+                phase = 'fadeIn';
+                phaseT = FADE_DUR;
+              }
+              break;
+            case 'fadeIn':
+              phaseT -= dt;
+              canvasOpacity = Math.min(1, 1 - phaseT / FADE_DUR);
+              if (phaseT <= 0) {
+                canvasOpacity = 1;
+                phase = 'countdown';
+                phaseT = COUNTDOWN_DUR;
+              }
+              break;
+          }
         }
+        if (routeLen > 0) renderer.domElement.style.opacity = canvasOpacity;
 
         const pos = routeCurve.getPointAt(anim.t);
         routePos = pos;
@@ -444,7 +561,10 @@ export default function MapBackground({
         focus.x += (pos.x - focus.x) * alpha;
         focus.y += (pos.y - focus.y) * alpha;
         focus.z += (pos.z - focus.z) * alpha;
-        let dh = Math.atan2(dir.x, dir.z) - heading;
+        // ヘディング目標: 通常はルート接線方向 / 到着フェーズは目標マーク重心方向（クリサム社屋・駅出口）
+        const targetHeading =
+          phase === 'arrive' ? arriveHeading : Math.atan2(dir.x, dir.z);
+        let dh = targetHeading - heading;
         dh = Math.atan2(Math.sin(dh), Math.cos(dh)); // 最短角で補間
         heading += dh * alpha;
 
@@ -455,7 +575,7 @@ export default function MapBackground({
         if (cfg.viewpoint === 'walking') {
           // 歩行: ルート上の眼高（routes.json の z に既反映）+ ユーザーの回転・パン・前後オフセット
           const yaw = heading + ctl.yaw;
-          const pitch = clamp(ctl.pitch - 0.04, -1.2, 1.2);
+          const pitch = clamp(ctl.pitch - 0.04 + ARRIVE_PITCH_LIFT * arriveBlend, -1.2, 1.2);
           const dirX = Math.cos(pitch) * Math.sin(yaw);
           const dirY = Math.sin(pitch);
           const dirZ = Math.cos(pitch) * Math.cos(yaw);
@@ -486,6 +606,23 @@ export default function MapBackground({
         if (routeFlat) routeFlat.visible = true;
         if (movingDot) movingDot.visible = true;
       }
+      // 路線（lines レイヤー・灰色チューブ）: 俯瞰視点のみ表示（歩行視点では非表示）
+      for (const o of railObjs) o.visible = cfg.viewpoint === 'aerial';
+
+      // 進行度（メートル）・カウントダウンの報告（整数変化時のみ、60fps の毎フレーム setState を避ける）
+      if (routeLen > 0) {
+        const mNow = Math.round(anim.t * routeLen);
+        if (mNow !== lastReportedM) {
+          lastReportedM = mNow;
+          if (cbRef.current.onProgress) cbRef.current.onProgress(mNow, Math.round(routeLen));
+        }
+        const cd = phase === 'countdown' ? Math.max(1, Math.ceil(phaseT)) : null;
+        if (cd !== lastReportedCd) {
+          lastReportedCd = cd;
+          if (cbRef.current.onCountdown) cbRef.current.onCountdown(cd);
+        }
+      }
+
       renderer.setViewport(0, 0, renderer.domElement.clientWidth, renderer.domElement.clientHeight);
       renderer.setScissorTest(false);
       renderer.render(scene, camera);
@@ -505,7 +642,7 @@ export default function MapBackground({
           if (!isPipAerial) {
             // PiP = 歩行: ルート上の現在位置のデフォルト姿勢（眼高 + 進行方向）。チューブは描画しない。
             const pYaw = heading;
-            const pPitch = -0.04;
+            const pPitch = -0.04 + ARRIVE_PITCH_LIFT * arriveBlend;
             const pDirX = Math.cos(pPitch) * Math.sin(pYaw);
             const pDirY = Math.sin(pPitch);
             const pDirZ = Math.cos(pPitch) * Math.cos(pYaw);
@@ -528,17 +665,19 @@ export default function MapBackground({
           renderer.setScissor(px, py, pw, ph);
           renderer.setScissorTest(true);
 
+          // 路線（lines レイヤー・灰色チューブ）: PiP=俯瞰（メイン=歩行）のみ表示
+          for (const o of railObjs) o.visible = isPipAerial;
+
           if (isPipAerial) {
             // PiP 俯瞰: 視界内（前方 ±30° セクタ）= 背景地図色そのまま、視界外 = 白へ混合した塗り色。
             // セクタの補集合は非凸のため単一パスのクリップでは表現できない →
-            // 「全窓減光 → オレンジルート上書き → 視界内再描画」の 3 パス。
+            // 「全窓減光 → 経路上書き → 視界内再描画」の 3 パス。
             // パス 1（視界外レベル）: 全マップレイヤーを減光マテリアルで全窓描画
-            if (routeLine) routeLine.visible = false;
             for (const o of pipFadeObjs) o.material = o.userData.pipFadedMat;
             renderer.render(scene, pipCam);
-            // パス 2（オレンジルート上書き）: ルートのみを描画（通常色・減光対象外・視界内外を問わず常時表示）。
-            // 一時的に depthWrite を ON にし、ルートが深度を書き込むことで、
-            // パス 3 の視界内再描画がルートのピクセルを上書きしないようにする。
+            // パス 2（経路上書き）: オレンジ経路チューブのみを通常色で描画（減光対象外・視界内外を問わず常時表示）。
+            // 一時的に depthWrite を ON にし、経路が深度を書き込むことで、
+            // パス 3 の視界内再描画が経路のピクセルを上書きしないようにする。
             world.visible = false;
             if (routeLine) {
               routeLine.visible = true;
@@ -698,7 +837,9 @@ export default function MapBackground({
     });
     rafId = requestAnimationFrame(frame);
 
-    threeRef.current = { scene, camera, renderer, container, updateRoute, resetRoute };
+    threeRef.current = { scene, camera, renderer, container, updateRoute };
+    // 外部 API（App 側からスライダー・停止ボタン等が呼ぶ）
+    if (apiRef) apiRef.current = { seekTo };
     return () => {
       disposed = true;
       cancelAnimationFrame(rafId);
@@ -749,11 +890,6 @@ export default function MapBackground({
   useEffect(() => {
     if (threeRef.current?.updateRoute) threeRef.current.updateRoute();
   }, [stationId, direction]);
-
-  // 停止（始点に戻る）: resetToken 変化時にルートをリセット
-  useEffect(() => {
-    if (resetToken > 0 && threeRef.current?.resetRoute) threeRef.current.resetRoute();
-  }, [resetToken]);
 
   return <div ref={containerRef} className="map-bg" aria-hidden="true" />;
 }
