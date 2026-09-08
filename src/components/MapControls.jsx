@@ -9,8 +9,8 @@
  * - 向き切替（駅→クリサム / クリサム→駅）
  * - 再生制御（音楽プレーヤー風、一段独立）:
  *   ▶ 再生 / ■ 停止（先頭へ）/ ⏸ 一時停止 /
- *   ⏩ 早送り（速度+2 m/s）/ ⏪ 早戻し（速度-2 m/s）/
- *   スライダー = 移動量（メートル）のシーク
+ *   ⏪ 早戻し（速度-2 m/s）/ 速度表示 / スライダー（移動量）/
+ *   移動距離表示 / ⏩ 早送り（速度+2 m/s）
  * - カメラ操作ヒント（1行）
  */
 
@@ -44,19 +44,43 @@ export default function MapControls({
               {group.line}
             </span>
             <div className="map-controls-station-items">
-              {group.items.map((st) => (
-                <button
-                  key={st.id}
-                  type="button"
-                  className={
-                    'map-controls-btn' +
-                    (stationId === st.id ? ' active' : '')
-                  }
-                  onClick={() => onStationChange(st.id)}
-                >
-                  {st.label}
-                </button>
-              ))}
+              {group.stations.map((st) =>
+                st.exits ? (
+                  <div
+                    key={st.name}
+                    className="map-controls-station-subgroup"
+                  >
+                    <span className="map-controls-station-name">
+                      {st.name}
+                    </span>
+                    {st.exits.map((exit) => (
+                      <button
+                        key={exit.id}
+                        type="button"
+                        className={
+                          'map-controls-btn' +
+                          (stationId === exit.id ? ' active' : '')
+                        }
+                        onClick={() => onStationChange(exit.id)}
+                      >
+                        {exit.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <button
+                    key={st.id}
+                    type="button"
+                    className={
+                      'map-controls-btn' +
+                      (stationId === st.id ? ' active' : '')
+                    }
+                    onClick={() => onStationChange(st.id)}
+                  >
+                    {st.name}
+                  </button>
+                ),
+              )}
             </div>
           </div>
         ))}
@@ -151,15 +175,6 @@ export default function MapControls({
           <button
             type="button"
             className="map-controls-player-btn"
-            title="早送り（速度 +2 m/s）"
-            aria-label="早送り（速度を上げる）"
-            onClick={onSpeedUp}
-          >
-            <span className="map-controls-icon map-controls-icon-ff" />
-          </button>
-          <button
-            type="button"
-            className="map-controls-player-btn"
             title="早戻し（速度 -2 m/s）"
             aria-label="早戻し（速度を下げる）"
             onClick={onSpeedDown}
@@ -181,6 +196,15 @@ export default function MapControls({
           <span className="map-controls-progress-label">
             {routeLenM > 0 ? `${progressM} / ${routeLenM} m` : '--'}
           </span>
+          <button
+            type="button"
+            className="map-controls-player-btn"
+            title="早送り（速度 +2 m/s）"
+            aria-label="早送り（速度を上げる）"
+            onClick={onSpeedUp}
+          >
+            <span className="map-controls-icon map-controls-icon-ff" />
+          </button>
         </div>
       </div>
     </div>

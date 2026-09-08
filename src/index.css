@@ -261,6 +261,19 @@ body {
   gap: 4px;
   flex-wrap: wrap;
 }
+.map-controls-station-subgroup {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-wrap: nowrap;
+}
+.map-controls-station-name {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-right: 1px;
+}
 .map-controls-toggle {
   display: flex;
   gap: 4px;
