@@ -4,7 +4,8 @@
  * 地図モード選択時にメインコンテンツ上部へ表示されるオプション操作パネル。
  * 横並びレイアウト（幅不足時は折り返し）+ 半透明白背景。
  *
- * - 始点選択（7駅 / 10始点）
+ * - モード切替（自動 / 手動）（1行目。自動 = 既定。自動モードは始点・向きを自動でランダム切替）
+ * - 始点選択（7駅 / 10始点、自動モードでは無効）
  * - 視点切替（歩行 / 俯瞰）（サブパネル PiP: 地図 canvas に現在の表示モードの反対側を小窓表示）
  * - 向き切替（駅→クリサム / クリサム→駅）
  * - 再生制御（音楽プレーヤー風、一段独立）:
@@ -17,6 +18,8 @@
 import { STATION_GROUPS } from '../data/stationPoints';
 
 export default function MapControls({
+  mode = 'manual',
+  onModeChange,
   stationId,
   onStationChange,
   viewpoint,
@@ -36,6 +39,28 @@ export default function MapControls({
 }) {
   return (
     <div className="map-controls">
+      <div className="map-controls-group map-controls-group-row">
+        <span className="map-controls-sublabel">モード</span>
+        <div className="map-controls-toggle">
+          <button
+            type="button"
+            className={'map-controls-btn' + (mode === 'auto' ? ' active' : '')}
+            onClick={() => onModeChange('auto')}
+          >
+            自動
+          </button>
+          <button
+            type="button"
+            className={
+              'map-controls-btn' + (mode === 'manual' ? ' active' : '')
+            }
+            onClick={() => onModeChange('manual')}
+          >
+            手動
+          </button>
+        </div>
+      </div>
+
       <div className="map-controls-group">
         <span className="map-controls-sublabel">始点</span>
         {STATION_GROUPS.map((group) => (
@@ -57,6 +82,7 @@ export default function MapControls({
                       <button
                         key={exit.id}
                         type="button"
+                        disabled={mode === 'auto'}
                         className={
                           'map-controls-btn' +
                           (stationId === exit.id ? ' active' : '')
@@ -71,6 +97,7 @@ export default function MapControls({
                   <button
                     key={st.id}
                     type="button"
+                    disabled={mode === 'auto'}
                     className={
                       'map-controls-btn' +
                       (stationId === st.id ? ' active' : '')
@@ -115,6 +142,7 @@ export default function MapControls({
         <div className="map-controls-toggle">
           <button
             type="button"
+            disabled={mode === 'auto'}
             className={
               'map-controls-btn' + (direction === 1 ? ' active' : '')
             }
@@ -124,6 +152,7 @@ export default function MapControls({
           </button>
           <button
             type="button"
+            disabled={mode === 'auto'}
             className={
               'map-controls-btn' + (direction === -1 ? ' active' : '')
             }

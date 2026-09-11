@@ -11,7 +11,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
  * 座標系: ENU（x=東, y=北, z=上）→ three.js Y-up 変換（world group rotation.x = -PI/2）
  *
  * 視点モード:
- * - walking: ルート上の眼高（1.6m）で進行方向に追従
+ * - walking: ルート上の眼高（1.6m）で進行方向に追従。カメラの仰角は経路の斜面に合わせて自動追従
+ *   （坂を上ると上を向く / 下ると下を向く / 平坦では水平。ユーザー操作 ctl.pitch は加算）
  * - aerial:  高所から斜めに俯瞰（軌道カメラ）
  *
  * サブパネル（PiP）: 画面下部の小窓に「現在の表示モードと逆」の視点を描画
@@ -69,6 +70,7 @@ const PI_FOV_HALF = THREE.MathUtils.degToRad(30);
 const COUNTDOWN_DUR = 3;   // 開始カウントダウン（秒）
 const ARRIVE_DUR = 3;      // 到着後停止（秒）
 const FADE_DUR = 0.45;     // フェードアウト/イン（秒）
+const BOOT_FADE_DUR = 0.8; // 起動フェード: ロード完了・視点確定後に opacity 0→1 へフェードイン（秒）
 const ARRIVE_PITCH_LIFT = 0.15; // 到着時の「少し見上げる」pitch 加算 (rad)
 
 // ============================================================
@@ -142,14 +144,15 @@ export default function MapBackground({
   apiRef = null,
   onProgress = null,
   onCountdown = null,
+  onRouteLoop = null,
   pipRef = null,
 }) {
   const containerRef = useRef(null);
   const threeRef = useRef(null);
   const configRef = useRef({ stationId, viewpoint, direction, speed, playing });
   configRef.current = { stationId, viewpoint, direction, speed, playing };
-  const cbRef = useRef({ onProgress, onCountdown });
-  cbRef.current = { onProgress, onCountdown };
+  const cbRef = useRef({ onProgress, onCountdown, onRouteLoop });
+  cbRef.current = { onProgress, onCountdown, onRouteLoop };
 
   useEffect(() => {
     const container = containerRef.current;
@@ -169,6 +172,8 @@ export default function MapBackground({
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setClearColor(0x000000, 0);
     container.appendChild(renderer.domElement);
+    // 初期ロード: ロード完了・視点確定まで不透明度100%（不可視）にし、その後フェードイン（BOOT_FADE_DUR）
+    renderer.domElement.style.opacity = 0;
 
     // ENU（x=東, y=北, z=上）→ three.js Y-up 変換用グループ
     const world = new THREE.Group();
@@ -189,7 +194,8 @@ export default function MapBackground({
     let phase = 'countdown';
     let phaseT = COUNTDOWN_DUR; // 現フェーズの残り時間（秒）
     let arriveBlend = 0;        // 到着時の「少し見上げる」イージング（0→1）
-    let canvasOpacity = 1;      // フェード用 canvas 不透明度
+    let canvasOpacity = 0;      // フェード用 canvas 不透明度（初期ロードは 0 スタート、視点確定後に復元）
+    let mapLoaded = false;      // ロード完了フラグ（全 GLB 読み込み完了まで false）
     let lastReportedM = -1;     // 直前に報告した位置（メートル）
     let lastReportedCd = -1;    // 直前に報告したカウントダウン値
     let arriveHeading = 0;      // 到着時に「目標を向く」方位（ルートの終端 → 目標マーク重心）
@@ -228,6 +234,8 @@ export default function MapBackground({
     const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 
+    let slopePitch = 0;          // 経路斜面のピッチ（rad、平滑化済み: 上り=+/下り=-）
+
     // ユーザーカメラオフセットをリセット（R キー）
     function resetCamCtl() {
       ctl.yaw = 0; ctl.pitch = 0; ctl.zoom = 1; ctl.fov = 0;
@@ -241,6 +249,7 @@ export default function MapBackground({
       const dir = routeCurve.getTangentAt(t);
       focus.x = pos.x; focus.y = pos.y; focus.z = pos.z;
       heading = Math.atan2(dir.x, dir.z);
+      slopePitch = Math.atan2(dir.y, Math.hypot(dir.x, dir.z));
     }
 
     // stationId / direction に応じてルートを再構築
@@ -325,11 +334,19 @@ export default function MapBackground({
       phase = 'countdown';
       phaseT = COUNTDOWN_DUR;
       arriveBlend = 0;
-      canvasOpacity = 1;
+      if (mapLoaded) {
+        if (canvasOpacity >= 1) {
+          canvasOpacity = 1;
+          renderer.domElement.style.opacity = 1;
+        } else {
+          // フェード中に呼び出された場合（自動モードのルートループ等）: fadeIn で opacity を復元し続ける
+          phase = 'fadeIn';
+          phaseT = FADE_DUR;
+        }
+      }
       lastReportedM = -1;
       lastReportedCd = -1;
       snapToRoute(0);
-      renderer.domElement.style.opacity = 1;
       if (cbRef.current.onProgress) cbRef.current.onProgress(0, Math.round(routeLen));
     }
 
@@ -338,8 +355,10 @@ export default function MapBackground({
       if (!routeLen || !routeCurve) return;
       anim.t = clamp(meters / routeLen, 0, 1);
       arriveBlend = 0;
-      canvasOpacity = 1;
-      renderer.domElement.style.opacity = 1;
+      if (mapLoaded) {
+        canvasOpacity = 1;
+        renderer.domElement.style.opacity = 1;
+      }
       if (anim.t <= 0.001) {
         phase = 'countdown';
         phaseT = COUNTDOWN_DUR;
@@ -482,6 +501,9 @@ export default function MapBackground({
       camera.lookAt(c3);
 
       updateRoute();
+
+      // ロード完了・視点確定: 次フレームから opacity 0→1 へ復元（起動フェード）
+      mapLoaded = true;
     }
 
 
@@ -527,6 +549,8 @@ export default function MapBackground({
                 arriveBlend = 0;
                 phase = 'fadeIn';
                 phaseT = FADE_DUR;
+                // ルートループ（終点→始点）の開始を報告（App 側が自動モードでランダム始点・向きの再抽選に使用）
+                if (cbRef.current.onRouteLoop) cbRef.current.onRouteLoop();
               }
               break;
             case 'fadeIn':
@@ -539,6 +563,10 @@ export default function MapBackground({
               }
               break;
           }
+        }
+        // 起動フェード: ロード完了・視点確定後に opacity 0→1 を線形復元
+        if (mapLoaded && canvasOpacity < 1) {
+          canvasOpacity = Math.min(1, canvasOpacity + dt / BOOT_FADE_DUR);
         }
         if (routeLen > 0) renderer.domElement.style.opacity = canvasOpacity;
 
@@ -568,14 +596,19 @@ export default function MapBackground({
         dh = Math.atan2(Math.sin(dh), Math.cos(dh)); // 最短角で補間
         heading += dh * alpha;
 
+        // 経路の斜面ピッチ（坂の上り=+/下り=-）を同一の指数平滑でフォロー
+        const targetSlope = Math.atan2(dir.y, Math.hypot(dir.x, dir.z));
+        slopePitch += (targetSlope - slopePitch) * alpha;
+
         // 視点切替時は旧位置からのスイープを防ぐため即座にスナップ
         if (lastViewpoint !== null && lastViewpoint !== cfg.viewpoint) snapToRoute(anim.t);
         lastViewpoint = cfg.viewpoint;
 
         if (cfg.viewpoint === 'walking') {
           // 歩行: ルート上の眼高（routes.json の z に既反映）+ ユーザーの回転・パン・前後オフセット
+          // 仰角は経路の斜面に自動追従（上りは上を向く / 下りは下を向く / 平坦は水平）
           const yaw = heading + ctl.yaw;
-          const pitch = clamp(ctl.pitch - 0.04 + ARRIVE_PITCH_LIFT * arriveBlend, -1.2, 1.2);
+          const pitch = clamp(ctl.pitch + slopePitch + ARRIVE_PITCH_LIFT * arriveBlend, -1.2, 1.2);
           const dirX = Math.cos(pitch) * Math.sin(yaw);
           const dirY = Math.sin(pitch);
           const dirZ = Math.cos(pitch) * Math.cos(yaw);
@@ -641,8 +674,9 @@ export default function MapBackground({
           const isPipAerial = cfg.viewpoint === 'walking'; // メイン=歩行 → PiP=俯瞰
           if (!isPipAerial) {
             // PiP = 歩行: ルート上の現在位置のデフォルト姿勢（眼高 + 進行方向）。チューブは描画しない。
+            // メインと同様、仰角は経路斜面に追従
             const pYaw = heading;
-            const pPitch = -0.04 + ARRIVE_PITCH_LIFT * arriveBlend;
+            const pPitch = slopePitch + ARRIVE_PITCH_LIFT * arriveBlend;
             const pDirX = Math.cos(pPitch) * Math.sin(pYaw);
             const pDirY = Math.sin(pPitch);
             const pDirZ = Math.cos(pPitch) * Math.cos(pYaw);

@@ -184,6 +184,20 @@ body {
   padding: 120px 56px 80px;
   min-height: 100vh;
 }
+/* メインコンテンツ・サイドバーの文字にページ背景色と同じ影（上下左右均等・約12px・外縁に向けて減衰）。
+   装飾背景（波 / 宇宙船 / 地図）が文字の裏で透けて見えるのを防ぎ可読性を高める。 */
+.main,
+.sidebar {
+  text-shadow:
+    0 0 2px var(--bg),
+    0 0 4px var(--bg),
+    0 0 8px var(--bg),
+    0 0 12px var(--bg);
+}
+/* 地図操作パネルは半透明白背景＋ボタン強調表示を持つため影を付与しない（継承を無効化） */
+.map-bottom {
+  text-shadow: none;
+}
 .page-wrap { width: 100%; max-width: 820px; margin: 0 auto; }
 
 /* ---------- Background canvases (decorative: wave / Space Wars vector) ---------- */
@@ -300,6 +314,14 @@ body {
   font-weight: 500;
   border-color: var(--navy);
   background: var(--navy);
+}
+.map-controls-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+/* 自動モードでも選択中始点は active ハイライトで表示（disabled の減光を解除） */
+.map-controls-btn.active:disabled {
+  opacity: 1;
 }
 .map-controls-slider {
   width: 120px;
@@ -419,12 +441,18 @@ body {
   border-top: 5px solid transparent;
   border-bottom: 5px solid transparent;
 }
-/* 再生段（一段独立） */
+/* 独立行（モード段 / 再生段: 一段独立） */
 .map-controls-group-row {
   flex-basis: 100%;
   border-top: 1px solid var(--line);
   padding-top: 10px;
   margin-top: 2px;
+}
+/* モード段（1行目）: 上辺線・上余白なし */
+.map-controls-group-row:first-child {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
 }
 .map-controls-speed {
   font-size: 12px;

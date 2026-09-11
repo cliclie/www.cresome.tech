@@ -21,13 +21,30 @@ const PAGES = [
 
 // 地図モードのデフォルト設定
 const MAP_CONFIG_KEY = 'cresome.mapConfig';
+// 自動モード: 直近 10 回の選択履歴（"stationId:direction"）。localStorage に保存しセッションをまたいで重複防止
+const MAP_AUTO_HISTORY_KEY = 'cresome.mapAutoHistory';
+const MAP_AUTO_HISTORY_MAX = 10;
 const defaultMapConfig = {
   stationId: 'otsuka',
   viewpoint: 'walking',
   direction: 1,
   speed: 5,
   playing: true,
+  mode: 'auto',
 };
+
+// 自動モードの選択履歴を復元（不正データ → 空配列）
+function loadAutoHistory() {
+  try {
+    const raw = window.localStorage.getItem(MAP_AUTO_HISTORY_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr)
+      ? arr.filter((s) => typeof s === 'string').slice(0, MAP_AUTO_HISTORY_MAX)
+      : [];
+  } catch {
+    return [];
+  }
+}
 
 export default function App() {
   const [current, setCurrent] = useState('home');
@@ -51,6 +68,8 @@ export default function App() {
         stationId: START_POINT_IDS.includes(saved.stationId)
           ? saved.stationId
           : defaultMapConfig.stationId,
+        // mode なしの旧データは既定の自動へ
+        mode: saved.mode === 'manual' ? 'manual' : defaultMapConfig.mode,
       };
     } catch {
       return defaultMapConfig;
@@ -127,6 +146,59 @@ export default function App() {
   // サブパネル（PiP）ウィンドウの ref（MapBackground が描画）
   const pipRef = useRef(null);
 
+  // 自動モード: 直近選択履歴（重複防止用）
+  const autoHistoryRef = useRef(null);
+  if (autoHistoryRef.current === null) autoHistoryRef.current = loadAutoHistory();
+
+  // 自動モード: 直近 10 回に選んだ始点＋方向を除いた組み合わせをランダムに選び、履歴へ記録
+  const pickAutoCombo = () => {
+    const combos = START_POINT_IDS.flatMap((id) => [
+      { stationId: id, direction: 1 },
+      { stationId: id, direction: -1 },
+    ]);
+    const recent = autoHistoryRef.current;
+    const available = combos.filter(
+      (c) => !recent.includes(`${c.stationId}:${c.direction}`),
+    );
+    const pool = available.length > 0 ? available : combos;
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    autoHistoryRef.current = [
+      `${pick.stationId}:${pick.direction}`,
+      ...recent,
+    ].slice(0, MAP_AUTO_HISTORY_MAX);
+    try {
+      window.localStorage.setItem(
+        MAP_AUTO_HISTORY_KEY,
+        JSON.stringify(autoHistoryRef.current),
+      );
+    } catch {
+      // 書き込み失敗は無視（履歴が永続化されなくなるだけ）
+    }
+    return pick;
+  };
+
+  // 自動モード: 地図表示へ入る／自動へ切替るとき即再抽選
+  // （前セッションの自動選択＝履歴先頭 がそのまま表示中なら引き継ぎ）
+  useEffect(() => {
+    if (bgMode !== 'map' || mapConfig.mode !== 'auto') return;
+    if (
+      autoHistoryRef.current[0] ===
+      `${mapConfig.stationId}:${mapConfig.direction}`
+    ) {
+      return;
+    }
+    const pick = pickAutoCombo();
+    updateMapConfig({ stationId: pick.stationId, direction: pick.direction });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bgMode, mapConfig.mode]);
+
+  // 自動モード: ルートループ開始（MapBackground.onRouteLoop）で始点・向きを再抽選
+  const onMapRouteLoop = () => {
+    if (mapConfig.mode !== 'auto') return;
+    const pick = pickAutoCombo();
+    updateMapConfig({ stationId: pick.stationId, direction: pick.direction });
+  };
+
   return (
     <>
       {bgMode === 'wave' ? (
@@ -143,6 +215,7 @@ export default function App() {
           apiRef={mapApiRef}
           onProgress={(m, len) => setMapProgress({ m, len })}
           onCountdown={(cd) => setMapCountdown(cd)}
+          onRouteLoop={onMapRouteLoop}
           pipRef={pipRef}
         />
       )}
@@ -172,6 +245,8 @@ export default function App() {
             )}
             <div className="map-bottom">
               <MapControls
+                mode={mapConfig.mode}
+                onModeChange={(m) => updateMapConfig({ mode: m })}
                 stationId={mapConfig.stationId}
                 onStationChange={(id) => updateMapConfig({ stationId: id })}
                 viewpoint={mapConfig.viewpoint}
