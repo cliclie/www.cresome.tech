@@ -170,3 +170,9 @@ three.js で読み込める GLB レイヤー群と最短経路を生成します
 
 - **変更** (`311eb5d`): `.clinerules/01-always.md`（AI ツール用の編集ルールファイル）を Git の管理対象外とし `.gitignore` に追加
 - **検証（実施済み）**: `git check-ignore -v` で `.gitignore` の該当ルールにヒットすること、および `git status` で未追跡ファイルから消えたことを確認
+
+### 2026-10-03: 波モード（背景エフェクト）の描画調整
+
+- **変更** (`8eee90c`): `src/components/WaveBackground.jsx` の波を、点数増加（`STEP` 24→12）・点サイズ小型化（`MAX_RADIUS` 1→0.5）・グロー（ぼかし）2 層描画の除去・点色暗化（`DOT_RGB` 200,200,210→150,150,160）に調整
+- **検証（実施済み）**: `npm run dev` / `npm run build` で確認後、`npm run deploy` で `publish`（`5c133c8`）へ反映。https://www.cresome.tech/ で「密・小・ぼかしなし・濃い灰色」の点波形を表示
+- 詳細は [WAVE.md](./WAVE.md) の作業記録を参照
