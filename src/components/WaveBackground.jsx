@@ -20,17 +20,19 @@ import { useEffect, useRef } from 'react';
 const TAU = Math.PI * 2;
 
 // 点の色（濃い灰色、RGB）
-const DOT_RGB = '200, 200, 210';
+// 元は '200,200,210'（薄い灰がかった青）だったが、点が暗く見えにくいので
+// より暗い '150,150,160' に変更。
+const DOT_RGB = '150, 150, 160';
 // const DOT_RGB = '0, 0, 0'; // デバッグ用（黒点で描画負荷を確認）
 
 // 透視投影の定数（世界座標基準。カメラは z=0 上方 CAM_H に位置）
 const Z_NEAR = 150; // 手前側の z（画面下端付近）
 const Z_FAR = 1000; // 奥側の z（地平線付近）
-const STEP = 24; // グリッド間隔（世界）
+const STEP = 12; // グリッド間隔（世界）← 24 から 12 にして点数を増やす
 const CAM_H = 240; // カメラの高さ
 const FOCAL = 600; // 焦点距離
 const HORIZON_Y = 0.20; // 地平線（画面高さの割合）— 縦画面でも上から広がる
-const MAX_RADIUS = 1; // 点の最大半径（px）
+const MAX_RADIUS = 0.5; // 点の最大半径（px）← 1 から 小さくして点を細く
 const AMP_REF = 40; // 山判定用の振幅基準値
 
 // 波形の高さ（世界座標）。サイン波 4 種の合成で 3D のうねりを表現
@@ -93,14 +95,7 @@ export default function WaveBackground() {
 
           const r = Math.min(1.8 * s, MAX_RADIUS);
 
-          // ぼかし（グロー）表現: 大きな低透明度の円を重ねて光りのように見せる
-          // （shadowBlur は数千点で描画コストが高いため、2層描画で代用）
-          ctx.fillStyle = `rgba(${DOT_RGB}, ${alpha * 0.25})`;
-          ctx.beginPath();
-          ctx.arc(sx, sy, r * 3, 0, TAU);
-          ctx.fill();
-
-          // コア部分（本体の点）
+          // 1 層の点のみ描画（グローを除去）
           ctx.fillStyle = `rgba(${DOT_RGB}, ${alpha})`;
           ctx.beginPath();
           ctx.arc(sx, sy, r, 0, TAU);
