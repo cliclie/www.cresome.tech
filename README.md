@@ -259,3 +259,4 @@ three.js で読み込める GLB レイヤー群と最短経路を生成します
 - **留意事項**:
   - Vite 8 の既定ビルドターゲット（`baseline-widely-available`）は据え置いた。これより古いブラウザでは動作しない可能性があるため、`index.html` に注意文を表示する（上記「留意事項」参照）
   - `map/viewer` は開発用ツールで公開対象外。検証で `dist/viewer` へコピーしたまま `npm run deploy` すると丸ごと公開されるため、必ず `npm run build`（`emptyOutDir: true`）で `dist` を再生成してからデプロイする
+- **公開（実施済み 2026-10-23）**: `main` へ `d22fb48`（523 ファイル、`map/viewer` の three ベンダー入替含む）を push。`npm run deploy` は vite 8.3.5 で再ビルド（36 modules / 209 ms、JS 893.06 kB・gzip 242.57 kB、CSS 19.08 kB・gzip 4.93 kB）後に `publish` へ `73f041d` を push し、`assets/index-BNrUcqLq.js` / `assets/index-C0Fhbv6a.css` へ更新（旧 `index-Cnq0sFEx.js` / `index-Ew1yXC0H.css` を削除）。https://www.cresome.tech/ の `index.html` が 1,621 → **2,925 bytes**（旧ブラウザ注意文を含む）になったことを実測で確認
