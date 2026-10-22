@@ -104,6 +104,7 @@ map/
 │  └─ lib/three/    vendored three.js (npm: three@0.169.0)
 └─ scripts/
    ├─ start_viewer.bat      ビュワー起動（python http.server + ブラウザ自動起動）
+   ├─ audit_deps.bat        依存パッケージの脆弱性監査（pip-audit / OSV・GitHub Advisory）
    └─ download_highways.py  OSM highway ways を Overpass API から取得 → data/osm/highways.json
 ```
 
@@ -126,6 +127,9 @@ python src/routes.py                 :: out/routes.json を生成（道路グラ
 
 :: 5) ビュワー起動 → http://localhost:8000/viewer/index.html
 scripts\start_viewer.bat
+
+:: 6) 依存の脆弱性監査（初回のみ python -m pip install pip-audit）
+scripts\audit_deps.bat
 ```
 
 # 成果物（out/）

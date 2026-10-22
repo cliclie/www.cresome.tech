@@ -21,9 +21,39 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic&display=swap" rel="stylesheet" />
+
+    <!-- 旧ブラウザ向け注意文: Vite 8 の既定ビルドターゲット未満の環境でのみ表示される -->
+    <style>
+      #legacy-browser-note {
+        margin: 0;
+        padding: 7px 12px 0;
+        font-size: 11px;
+        line-height: 1.6;
+        letter-spacing: 0.04em;
+        text-align: center;
+        color: rgba(180, 40, 40, 0.55);
+      }
+      #legacy-browser-note[hidden] { display: none; }
+    </style>
   </head>
   <body>
+    <p id="legacy-browser-note" hidden>このブラウザでは正常に動作しないかもしれません。</p>
     <div id="root"></div>
+    <script>
+      /* Vite 8 の既定ビルドターゲット（baseline-widely-available: Chrome/Edge 111・
+         Safari 16.4・Firefox 114 相当）より古いブラウザを検出して注意文を表示する。
+         判定マーカーは ES2022〜2024 の機能有無（Object.hasOwn / structuredClone /
+         String.prototype.isWellFormed）。ターゲット境界よりわずかに広い範囲を
+         許容する＝極端に古い環境のみ警告が出る。 */
+      (function () {
+        var modern = typeof Object.hasOwn === 'function' &&
+          typeof structuredClone === 'function' &&
+          typeof String.prototype.isWellFormed === 'function';
+        if (modern) return;
+        var note = document.getElementById('legacy-browser-note');
+        if (note) note.hidden = false;
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

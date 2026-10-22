@@ -76,12 +76,13 @@
 
 ## テストツールの使い方
 
-- **簡易 3D ビュワー**（`map/viewer/`、vanilla three.js・CDN 非依存、three.js 0.169.0 は `map/viewer/lib/three/` に vendored）:
+- **簡易 3D ビュワー**（`map/viewer/`、vanilla three.js・CDN 非依存、three.js 0.186.1 を `map/viewer/lib/three/` に vendored）:
   ```bat
   scripts\start_viewer.bat        :: python http.server 起動 + ブラウザ自動起動
   ```
   → http://localhost:8000/viewer/index.html
   - 地図切替: URL のクエリ `?base=../out_white/` を付与すると白地図風セット（`out_white/`）を読み込み（既定は `out/`）
+  - three を更新する場合は `map/viewer` で `npm i three@<版>` → `node_modules/three/build` と `node_modules/three/examples/jsm` を `lib/three/` へコピーして入れ替える（0.186 で `.min.js` の同梱が廃止され `three.core.js` 分割になったため、旧 `.min.js` は削除される）。`lib/three` は git 管理下だが Tailwind の走査対象には含めないこと（`src/index.css` の `@source` 参照）
 - **検証スクリプト**（Python）:
   - `python src/verify_glb.py` — `out/` の GLB 整合性チェック（全 GLB（terrain 含む 9 ファイル）の読み込み・頂点数・bbox・頂点色）
   - `python src/verify_changes.py` — 白地図 roads.glb / 地形の突き抜け検証

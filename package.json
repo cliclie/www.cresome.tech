@@ -7,22 +7,23 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "npm run build && node scripts/deploy.mjs"
+    "deploy": "npm run build && node scripts/deploy.mjs",
+    "audit": "npm audit --audit-level=high",
+    "approve:scripts": "npm install-scripts approve puppeteer"
   },
   "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "three": "^0.185.1"
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "three": "^0.186.1"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.4",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.49",
-    "puppeteer": "^25.10.0",
-    "tailwindcss": "^3.4.17",
-    "vite": "^5.4.11"
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^6.1.2",
+    "puppeteer": "^25.16.0",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.5"
   },
   "allowScripts": {
-    "puppeteer@25.10.0": true
+    "puppeteer@25.16.0": true
   }
 }

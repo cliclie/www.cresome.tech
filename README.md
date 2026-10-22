@@ -7,8 +7,8 @@ GitHub Pages（[https://www.cresome.tech](https://www.cresome.tech)、CNAME: `ww
 
 ## 技術スタック
 
-- Vite + React（SPA）
-- Tailwind CSS
+- Vite 8（Rolldown ビルド）+ React（SPA）
+- Tailwind CSS 4（`@tailwindcss/vite` プラグイン）
 - フォント: ZEN丸ゴシック（Google Fonts）
 
 ## 使い方
@@ -18,7 +18,18 @@ npm install        # 依存関係をインストール
 npm run dev        # 開発サーバーを起動
 npm run build      # 本番ビルド（dist/ に出力）
 npm run preview    # ビルド結果をプレビュー
+npm run audit      # 依存関係の脆弱性監査（High 以上で非ゼロ終了）
+npm run approve:scripts  # puppeteer 更新後に postinstall（Chromium 取得）を承認
 ```
+
+依存監査の恒久化:
+
+- ルート（npm）: `npm run audit`。GitHub Dependabot も `.github/dependabot.yml` で有効
+  （`/`、`/map`、`/map/viewer` の 3 エコシステムを毎週月曜 10:00 JST にチェック）。
+- `map/`（Python）: `map\scripts\audit_deps.bat`（初回は `python -m pip install pip-audit` が必要）。
+- `package.json` の `allowScripts` は **semver レンジ不可**（npm が `^` `~` `>=` を拒否し、
+  完全一致バージョンを `||` で連結する形式のみ）。puppeteer を更新したら
+  `npm run approve:scripts` を実行しないと、Chromium 取得の postinstall が黙ってスキップされます。
 
 ## デプロイ（GitHub Pages）
 
@@ -47,13 +58,40 @@ publish ブランチには以下のファイルのみ存在します:
 
 ## 留意事項: アセットファイル名のビルド再現性
 
-- `package.json` の `vite` はキャレット指定（`^5.4.11`）のため、`npm install` のタイミングによって解決される 5.4.x パッチ版が変わり得ます。
-- Vite（および同梱の esbuild）のバージョンが異なると、**ソースコードを変更していてもいないなくても**、ビルド成果物の内容ハッシュが変わることがあります。例:
+- `package.json` の `vite` はキャレット指定（`^8.3.5`）のため、`npm install` のタイミングによって解決される 8.x パッチ版が変わり得ます。
+- Vite（および同梱の Rolldown / Lightning CSS）のバージョンが異なると、**ソースコードを変更していてもいないなくても**、ビルド成果物の内容ハッシュが変わることがあります。例:
   - `assets/index-CsZMAxLG.js` → `assets/index-DAFwLBMo.js`
   - `assets/cresome_logo-CqxN7NRr.svg` → `assets/cresome_logo-CqxN7NRr-CqxN7NRr.svg`（アセット名に二重ハッシュ）
 - 動作自体には影響しません。`npm run deploy` は publish worktree を全削除してから新しいビルド成果物を配置するため、そのまま push して公開すれば問題ありません。
 - ただし、デプロイ後に publish ブランチへ反映される `assets/*` のファイル名が前回のものと異なる場合がありますので、差分がファイル名の変化中心である場合は上記の理由によるものとご判断ください。
 - 前回デプロイ時と同一の Vite バージョンでビルドしたい場合は、該当コミットの `package.json` / `package-lock.json` を復元して `npm ci` を実行してください。
+
+## 留意事項: `src/index.css` は LF 改行が必須（Tailwind CSS v4）
+
+- Tailwind CSS v4 のパーサは CRLF 改行を正しく扱えず、`src/index.css` が CRLF の場合 `npm run build` が
+  `CssSyntaxError: Invalid declaration` で失敗します（同一内容を LF にすると成功）。
+- 開発環境が `core.autocrlf=true` でも CSS が CRLF でチェックアウトされないよう、
+  `.gitattributes` に `*.css text eol=lf` を宣言して固定しています。**このルールを消すとビルドが壊れます。**
+- 今後 CSS ファイルを増やす場合は `.gitattributes` に同種のルールを追加してください（LF 推奨）。
+
+## 留意事項: Tailwind の走査対象を明示している（`src/index.css` 先頭）
+
+- Tailwind CSS v4 のソース自動検出は `.gitignore` 対象外を走査するため、放置すると
+  `map/viewer/lib/three/`（three.js のベンダーコピー約 500 ファイル）まで読み込み、
+  不要なユーティリティを生成して CSS が肥大化します（実測 19.08 kB → 26.22 kB、
+  ビルドも 207 ms → 2.35 s に悪化）。
+- そこで `@import "tailwindcss" source(none);` で自動検出を無効化し、`@source` で
+  旧 `tailwind.config.js` の `content` と同じ `index.html` と `src/**/*.{js,jsx}` のみに限定しています。
+  **Tailwind に走査させるファイルを追加する場合は `@source` へ追記してください。**
+
+## 留意事項: 旧ブラウザへの注意表示
+
+- Vite 8 の既定ビルドターゲットは `baseline-widely-available`（Chrome/Edge 111・Safari 16.4・Firefox 114 相当）で、
+  これより古いブラウザでは成果物が動作しない可能性があります。ターゲットは意図的に既定値のまま据え置き、
+  `index.html` の先頭に「このブラウザでは正常に動作しないかもしれません。」を
+  薄い赤字（11 px・`rgba(180, 40, 40, 0.55)`）で表示します。
+- 判定はインラインのクラシックスクリプト（ES5 構文）で行い、`Object.hasOwn` / `structuredClone` /
+  `String.prototype.isWellFormed` の有無でモダンさを検査します（ターゲット境界よりわずかに広い範囲を許容）。
 
 ## サイト構成
 
@@ -176,3 +214,48 @@ three.js で読み込める GLB レイヤー群と最短経路を生成します
 - **変更** (`8eee90c`): `src/components/WaveBackground.jsx` の波を、点数増加（`STEP` 24→12）・点サイズ小型化（`MAX_RADIUS` 1→0.5）・グロー（ぼかし）2 層描画の除去・点色暗化（`DOT_RGB` 200,200,210→150,150,160）に調整
 - **検証（実施済み）**: `npm run dev` / `npm run build` で確認後、`npm run deploy` で `publish`（`5c133c8`）へ反映。https://www.cresome.tech/ で「密・小・ぼかしなし・濃い灰色」の点波形を表示
 - 詳細は [WAVE.md](./WAVE.md) の作業記録を参照
+
+### 2026-10-23: サードパーティ依存のセキュリティ更新（Vite 8 / Tailwind CSS 4）と `map/` 生成環境の CVE 対応
+
+- **背景**: `npm audit` が報告した 10 件（High 7 / Moderate 3）に加え、OSV（GitHub Advisory / PyPI）照会で Vite 固有の advisory と `map/` の Python 環境の advisory を追加検出した（npm 側 12 advisory・PyPI 側 4 advisory）。公開物（`publish` ブランチの静的ファイル）に `node_modules` のコードは含まれず **www.cresome.tech 自体を直接狙える CVE は 0 件**だったが、開発サーバー（Vite 5 系）には Windows 環境由来の実害がありうる CVE が多いため、ツールチェーンを更新した。
+- **検出していた主な脆弱性（すべて解消済み）**:
+  1. `vite` 5.4.21 — CVE-2026-53571（`server.fs.deny` bypass on Windows alternate paths）/ CVE-2026-112946（`server.fs.allow` 外のファイル提供）/ CVE-2026-112945（独自ミドルウェア経由の cross-origin script execution）/ CVE-2026-39365（依存最適化 `.map` の path traversal）。**Vite 5 系には修正リリースが存在しない（EOL）**
+  2. `vite` 5.4.21・`launch-editor` — CVE-2026-53632（UNC パス経由の NTLMv2 ハッシュ漏洩）/ CVE-2026-112942 / CVE-2026-112943 / CVE-2026-112944（エディタ CLI 引数起因の任意コマンド実行）
+  3. `esbuild` 0.21.5（vite 5 同梱）— GHSA-67mh-4wv8-2f99（dev サーバーの `Access-Control-Allow-Origin: *` によるソース漏洩）
+  4. `source-map-js` 1.2.1（`postcss` 経由）— CVE-2026-93749（indexed source-map の offset 未検証による event-loop DoS）
+  5. `braces` 3.0.3（`tailwindcss` 3 → chokidar / micromatch / fast-glob 経由）— CVE-2026-93687（深いネストの brace パターンでスタック枯渇）。**上流に修正版なし** → Tailwind 4 で依存ごと除去
+  6. `postcss-selector-parser` 6.1.4 — CVE-2026-104844（フラットセレクタ解析の O(n²) による CPU 枯渇、6 系へのバックポートなし）→ Tailwind 4 で依存ごと除去
+  7. `urllib3` 2.7.0（`map/`）— GHSA-8988-9cw3-xx77（HTTPS プロキシ TLS 設定が無視されうる）/ GHSA-gh4c-6fx4-qh6g（chunked deflate で無限ループ）/ GHSA-vxq7-64xx-v4gw（無制限の chunk-size バッファ）。PLATEAU・Overpass からの大容量ダウンロードに直接関わる
+  8. `certifi` 2026.7.22（`map/`）— GHSA-6q48-6c7w-9gw2（中間 CA の鍵が漏洩した emSign ルート CA を同梱）
+- **適用内容**:
+  1. `vite` `^5.4.11` → **`^8.3.5`**、`@vitejs/plugin-react` `^4.3.4` → **`^6.1.2`**（Rolldown / Oxc ベースへ移行）
+  2. `tailwindcss` `^3.4.17` → **`^4.3.3`**、**`@tailwindcss/vite@^4.3.3`** を `vite.config.js` の plugins に追加。`postcss.config.js` と `tailwind.config.js` は不要になったため削除、`autoprefixer` と `postcss` も devDependencies から削除（Tailwind 4 内蔵の Lightning CSS が処理）
+  3. `src/index.css` 先頭の `@tailwind base / components / utilities` → `@import "tailwindcss";`
+  4. `puppeteer` `^25.10.0` → **`^25.16.0`**、`npx update-browserslist-db@latest` で `caniuse-lite` を更新
+  5. `package.json` の `allowScripts` を `puppeteer@25.16.0` に更新（**ピン留めが古ままだと postinstall の Chromium 取得が黙ってスキップされる**。`npm install-scripts approve puppeteer` で更新できる）
+  6. `map/requirements.txt` — `urllib3>=2.8.0` と `certifi>=2026.10.19` を明示追加（requests の内部依存なので記載しないと古い版が解決される）、`numpy>=2.5.4` / `pyproj>=3.8` / `shapely>=2.2` / `trimesh>=5.1.1` / `requests>=2.32.5` へ下限を引き上げ（実環境も同版へ更新済み）
+- **Tailwind CSS 4 移行で必要になった補正**:
+  1. **改行コード**: v4 のパーサは CRLF 改行で `CssSyntaxError: Invalid declaration` を起こすため、`src/index.css` を LF に正規化し `.gitattributes`（`*.css text eol=lf`）で恒久化（上記「留意事項」参照）
+  2. **複数行に跨る宣言**: `.main, .sidebar` の `text-shadow:` を複数行値から 1 行へ正規化（v4 パーサでの解析失敗を避ける）
+  3. **Preflight の挙動差**: v3 が定義していた `button { cursor: pointer }` は v4 に存在しないため、`@layer base` に `button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }` を追加して既存のカーソル挙動を維持（`MapControls.jsx` に `disabled` を持つボタンが 5 箇所あるため `:not(:disabled)` 付き）
+  4. `tailwind.config.js` の `theme.extend`（`bg` / `navy` / `accent` / `font-sans`）は JSX・CSS のいずれからも参照されていなかったため、`@theme` への移植は行わず削除
+- **変更後の検証（実施済み）**:
+  1. `npm audit` → **found 0 vulnerabilities**。OSV 照会でも npm / PyPI ともに関連 advisory 0 件
+  2. `npm run build` 成功（vite 8.3.5）。最終的な成果物は JS 893.06 kB（gzip 242.57 kB）、CSS 19.08 kB（gzip 4.93 kB）、ビルド 207 ms。※これは Phase 4（React 19 / three 0.186）適用後の値。更新前は JS 811.98 kB（gzip 222.26 kB）、CSS 19.31 kB（gzip 4.67 kB）、ビルド 1.60 s
+  3. `npm run dev`（vite 8.3.5）が **295 ms** で起動、`/`・`/src/main.jsx`・`/src/index.css` が 200、`node_modules/.vite/deps` に react / react-dom の最適化結果が生成される（ジョクション経由ワークスペースで発生していた依存最適化クラッシュは再現せず。`vite.config.js` の `process.chdir(root)` はそのまま維持）
+  4. `npm run preview` で `/`・Google Search Console 検証ファイル・`/map/manifest.json` が 200
+  5. Python 側は urllib3 2.8.0 / certifi 2026.10.19 / numpy 2.5.4 / shapely 2.2.0 / pyproj 3.8.0 / trimesh 5.1.1 で、座標変換・shapely 演算・trimesh の GLB 往復を実行して異常なし
+  6. 解決されるパッケージ総数が **156 → 59** に減少（esbuild / rollup / braces / chokidar / micromatch / fast-glob / postcss-selector-parser / autoprefixer / @babel/core が消え供給網の攻撃面が縮小）
+- **Phase 4（追加適用）**: `three` `^0.185.1` → **`^0.186.1`**、`react` / `react-dom` `^18.3.1` → **`^19.3.1`**、`map/viewer` のベンダーコピー（`lib/three/`）を **0.169.0 → 0.186.1** に差し替え
+  - r186 で本サイトに効く改善: 破棄済み Geometry の属性を削除（#33939・メモリリーク改善）、`Renderer.resetState()` 追加（#33877）、`BufferGeometry` のシリアライズ整理（#34044）、`toJSON()` の既定値チェック撤廃による軽量化（#34178）
+  - ベンダー差し替えは `build/` と `examples/jsm/` を丸ごと入替（0.186 は `.min.js` の同梱が廃止され `three.core.js` へ分割されたため、旧 `.min.js` 群を削除して `build` 6 ファイル + `examples/jsm` 500 ファイルに更新）
+  - **代償**: React 19 はバンドルが大きく、JS が 801.76 kB → **893.06 kB（gzip 217.47 → 242.57 kB）** に増加（three 0.186 の寄与は +12 kB のみ）。サイズを優先する場合は `npm i react@^18.3.1 react-dom@^18.3.1` で戻せる（いずれも advisory は無し）
+  - **検証**: `map/viewer` は `vite preview` 経由（`?base=../map/`）で GLB 18 件が 200、canvas 1・駅ラベル 11・レイヤー切替 19・エラー無し。本サイトの地図モードも three 0.186 + React 19 でスクリーンショット 124 kB（更新前 132 kB と同等の描画量）、`pageerror` / `console.error` ゼロを確認
+  - three の viewport/scissor 挙動変更（r186 以降「レンダーターゲットにバインドされている時は pixel ratio でスケールしない」）は、`MapBackground.jsx` が `setRenderTarget()` を使わず既定キャンバスへ直接描画しているため影響なし（PiP 俯瞰の `setViewport` / `setScissor` / `setScissorTest` はそのまま）
+  - React 19 で削除された API（`ReactDOM.render` / `hydrate` / `unmountComponentAtNode` / string refs / `defaultProps` / `propTypes`）は本リポジトリで未使用。`main.jsx` の `ReactDOM.createRoot` と `<React.StrictMode>` は 19 でもそのまま有効（新 JSX トランスフォームは `@vitejs/plugin-react` が処理）
+- **恒久化**: `.github/dependabot.yml`（npm `/`・pip `/map`・npm `/map/viewer` を毎週月曜 10:00 JST にチェック）、`package.json` の `audit` / `approve:scripts` スクリプト、`map/scripts/audit_deps.bat`（pip-audit）を追加
+- **旧ブラウザへの注意表示**: Vite 8 の既定ビルドターゲットは据え置き、`index.html` に判定スクリプト（ES5・クラシック）と薄い赤字の注意文（11 px・`rgba(180, 40, 40, 0.55)`）を追加。詳細は上記「留意事項」
+- **Tailwind の走査対象を限定**: v4 の自動検出は git 管理下なら何でも走査するため、`map/viewer/lib/three`（ベンダー 331 → 500 ファイル）まで読み込んで CSS が 19.31 → 24.46 → 26.22 kB に膨らんだ。`@import "tailwindcss" source(none)` + `@source` で旧 `content` と等価な `index.html` と `src/**/*.{js,jsx}` に限定し、CSS 19.08 kB・ビルド 2.35 s → 207 ms へ改善
+- **留意事項**:
+  - Vite 8 の既定ビルドターゲット（`baseline-widely-available`）は据え置いた。これより古いブラウザでは動作しない可能性があるため、`index.html` に注意文を表示する（上記「留意事項」参照）
+  - `map/viewer` は開発用ツールで公開対象外。検証で `dist/viewer` へコピーしたまま `npm run deploy` すると丸ごと公開されるため、必ず `npm run build`（`emptyOutDir: true`）で `dist` を再生成してからデプロイする

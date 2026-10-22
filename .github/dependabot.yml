@@ -1,0 +1,28 @@
+version: 2
+updates:
+  # 公開サイト本体（vite / @vitejs/plugin-react / tailwindcss / @tailwindcss/vite / three / react / puppeteer）
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      time: "10:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 5
+
+  # 3D マップデータ生成パイプライン（Python）
+  - package-ecosystem: pip
+    directory: "/map"
+    schedule:
+      interval: weekly
+      time: "10:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 3
+
+  # ローカルビュワー（three のベンダーコピー元: map/viewer/lib/three）
+  - package-ecosystem: npm
+    directory: "/map/viewer"
+    schedule:
+      interval: weekly
+      time: "10:00"
+      timezone: "Asia/Tokyo"
+    open-pull-requests-limit: 3

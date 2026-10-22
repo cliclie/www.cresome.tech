@@ -1,0 +1,4 @@
+# Tailwind CSS v4 のパーサは CRLF 改行を正しく解釈できず
+# 「CssSyntaxError: Invalid declaration」でビルドが失敗する。
+# core.autocrlf=true でも CSS は必ず LF でチェックアウトさせる。
+*.css text eol=lf
