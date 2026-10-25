@@ -18,6 +18,7 @@ npm install        # 依存関係をインストール
 npm run dev        # 開発サーバーを起動
 npm run build      # 本番ビルド（dist/ に出力）
 npm run preview    # ビルド結果をプレビュー
+npm run bench:fetch # 記事のベンチマークデータを各環境設定リポジトリから再取得（src/data/articles/llm-bench.json）
 npm run audit      # 依存関係の脆弱性監査（High 以上で非ゼロ終了）
 npm run approve:scripts  # puppeteer 更新後に postinstall（Chromium 取得）を承認
 ```
@@ -95,8 +96,9 @@ publish ブランチには以下のファイルのみ存在します:
 
 ## サイト構成
 
-- トップ / 事業内容 / 開発フロー / 会社概要
+- トップ / 事業内容 / 開発フロー / 会社概要 / 記事（記事機能の詳細は [ARTICLES.md](./ARTICLES.md) を参照）
 - 右サイドバー（モバイルは右スライドメニュー）
+  - 「記事」は他の並びより間隔を広げ、直下に記事の最新更新日を表示する
 - ページ切り替えはフェード、要素はスクロールフェードイン
 - 全ページ共通の背景エフェクト（3D 点波形 / Space Wars 風ベクター / 3D ワイヤーフレームマップの 3 モード。詳細は [WAVE.md](./WAVE.md) / [SPACESHIP.md](./SPACESHIP.md) / [MAP.md](./MAP.md) を参照）
 
@@ -106,6 +108,14 @@ publish ブランチには以下のファイルのみ存在します:
 - サブ（テキスト）: `#404080`
 - アクセント: `#EF5B00`
 - 詳細は [design.md](./design.md) を参照
+
+## 記事（`src/pages/Articles.jsx`）
+
+右サイドメニューの「記事」から入る一覧機能で、**左ペイン＝記事一覧（更新日・タイトル）／右ペイン＝記事本文** の 2 列レイアウトです（横幅 1080px 未満では縦積み）。実装詳細・データ生成・運用は **[ARTICLES.md](./ARTICLES.md)** を参照。
+
+- メニューは「トップ」〜「会社概要」より間隔を広げ、直下に記事の最新更新日を表示します（`Sidebar.jsx` / `Drawer.jsx` 共通、`.nav-group--spaced` と `.nav-sub`）
+- 記事の追加は、本文を `src/pages/articles/` に置いて `src/data/articles/index.js` の `ARTICLES` に登録するだけ（メニュー側の変更不要）
+- **記事1「ローカル環境でローカルLLMをローカルな条件でベンチマーク」**: 自社内 3 台（AI TOP ATOM / whitebearatom2 / Whitebear2026）の環境設定リポジトリの README から `npm run bench:fetch`（`scripts/fetch-llm-bench.mjs`）が生成した 37 環境の一覧。15 列（順位・モデル名・重み名・decode・prefill・コンテキスト長・使用メモリ・機種名・OS・CPU・搭載RAM・推論エンジン・エンジン版・計測日・備考）を全列ソートでき、ヘッダー行と先頭 2 列は固定、行クリックで詳細諸元をポップアップします。一覧はブラウザ幅に追従し、社内 IP は公開バンドルに含めません
 
 ## 背景エフェクト
 
@@ -260,3 +270,34 @@ three.js で読み込める GLB レイヤー群と最短経路を生成します
   - Vite 8 の既定ビルドターゲット（`baseline-widely-available`）は据え置いた。これより古いブラウザでは動作しない可能性があるため、`index.html` に注意文を表示する（上記「留意事項」参照）
   - `map/viewer` は開発用ツールで公開対象外。検証で `dist/viewer` へコピーしたまま `npm run deploy` すると丸ごと公開されるため、必ず `npm run build`（`emptyOutDir: true`）で `dist` を再生成してからデプロイする
 - **公開（実施済み 2026-10-23）**: `main` へ `d22fb48`（523 ファイル、`map/viewer` の three ベンダー入替含む）を push。`npm run deploy` は vite 8.3.5 で再ビルド（36 modules / 209 ms、JS 893.06 kB・gzip 242.57 kB、CSS 19.08 kB・gzip 4.93 kB）後に `publish` へ `73f041d` を push し、`assets/index-BNrUcqLq.js` / `assets/index-C0Fhbv6a.css` へ更新（旧 `index-Cnq0sFEx.js` / `index-Ew1yXC0H.css` を削除）。https://www.cresome.tech/ の `index.html` が 1,621 → **2,925 bytes**（旧ブラウザ注意文を含む）になったことを実測で確認
+### 2026-10-25: 右サイドメニューに「記事」セクションを追加（ローカルLLMベンチマーク記事）
+
+- **要件**: 「トップ」〜「会社概要」より間隔を広げた「記事」をメニューに追加し、直下に記事の更新日付を表示。選択時はメイン領域を左ペイン（記事一覧: タイトル・日付）／右ペイン（本文）に構造化。最初の記事は自社内 3 台の環境設定リポジトリから取得したローカルLLM性能の一覧（順位・モデル名・重み名・decode・prefill・コンテキスト長・使用メモリ・機種名・OS・CPU・搭載RAM・推論エンジン・エンジンバージョン。全列ソート、ヘッダー行と 1 列目を固定、行クリックで詳細ポップアップ）。
+- **ソースへの接続確認**
+  1. Gitea `gitadmin/DGXSparkLLMEnv`・`gitadmin/Atom2LLM` は匿名 HTTP で README / raw / REST API とも取得可
+  2. `https://github.com/cliclie/Whitebear2026-WSL2` は HTTPS だと 404（公開一覧 3 件にも Gitea にも同名リポジトリ無し）→ プライベートと判明。**SSH 公開鍵 `~/.ssh/id_ed25519.pub`（`SHA256:nQAp/SJ3sqsRjcliQbWgWM+8sdOOcZ08JsPedWWsltk`）を GitHub に登録**し、`ssh -T git@github.com` が `Hi cliclie!` を返すこと、`git ls-remote` / shallow clone で README が読めることを確認
+- **追加・変更ファイル**
+  - 新規: `scripts/fetch-llm-bench.mjs`（README 表の解析 → JSON 生成。`main()` は直接実行時のみ走る。パース関数は export して単体確認可能）
+  - 新規: `src/data/articles/llm-bench.json`（37 環境分・生成物）、`src/data/articles/index.js`（記事登録）、`src/data/articles/useBench.js`（JSON の遅延読み込み）
+  - 新規: `src/pages/Articles.jsx`、`src/pages/articles/LocalLlmBench.jsx`、`src/components/articles/BenchTable.jsx`、`src/components/articles/BenchDetailModal.jsx`
+  - 変更: `src/App.jsx`（`PAGES` に `articles` / `spaced`、`navItems` に `spaced`・`sublabel`、`page-wrap--wide`）、`src/components/Sidebar.jsx`・`Drawer.jsx`（`.nav-group` ラッパーで間隔と更新日付）、`src/index.css`（メニュー・記事・ベンチ表・モーダル）、`package.json`（`bench:fetch`）
+- **設計上の判断**
+  - 公開サイトから社内 IP（`192.168.0.101`）を実行時に叩かないよう、ビルド時に JSON へ焼き込むスナップショット方式 adopted
+  - 出典 URL は既定でバンドルに含めない（`PUBLISH_SOURCE_URL = false`）。生成 JSON・dist を grep して `192.168` が 0 件であることを確認。記事本文の出典欄は機種名テキストのみ、詳細ポップアップは出典行を非表示
+  - ベンチ JSON を静的 import するとメインバンドル（three.js 由来）に 55 kB 追加され chunk 警告（900 kB）を悪化させるため、`useBench()` の動的 `import()` で別チャンク化（`llm-bench-*.js` 55.46 kB / gzip 10.12 kB。メインは 905.82 kB / gzip 246.43 kB で変更前と同水準）
+  - 抽出規則: `<br>` 第1ブロック＝現行値（旧エンジン値を除外）、「平均 X」優先、`同上` は直前行を継承、範囲は上限、`14.2 + 1.4GB` は合計、MiB/GiB 併記は括弧内を優先（`（+163MB）` のような差分表記は除く）、`（空き …）` は捨てる。HuggingFace ID は README・起動スクリプトに実在する表記のみとし、推測は `null`（「—」表示）に留めた
+- **検証（`vite preview` + puppeteer・1440×900 / 390×844）**
+  1. メニュー: `NAV_TOPS = [167, 215, 264, 312, 385]`（通常 49px 間隔に対し「記事」は 73px）、`nav-sub = 2026-10-25`、全項目 `clientWidth/scrollWidth = 148/148`（折返し・切れなし）
+  2. レイアウト: `page-wrap 1128px / 記事一覧 250px / 本文 844px`。モバイル（390px）は一覧 342px が上、本文が下（縦積み）
+  3. 一覧: 37 行を描画。横 700px・縦 240px スクロール後も順位とモデル名の左固定が同一位置（`pinModelLeft = pinCellLeft = 399`）で、ヘッダー不透明化により下層行の透けなし
+  4. ソート: prefill 降順で先頭 `5,916`、昇順で先頭 `292.4` かつ末尾 4 行が「—」（未計測は常に末尾）、順位列で `1,2,3` に復帰
+  5. 詳細ポップアップ: 機種メタ + 諸元 + 原文表記 + 出典リンクを表示、Esc で閉じる。コンソールエラーなし
+- **未公開**: `npm run deploy` は未実施（`main` へのコミット・push も未実施）
+#### 2026-10-25 追補: 搭載RAM の確定と一覧の3点修正（公開前確認での指摘）
+
+- **搭載RAM**: `whitebearatom2` = **32GB**、`Whitebear2026`（WSL2）= **86GB（WSL 割当）** に確定（実機情報）。`MACHINES` の `ram` を更新し、Whitebear2026 は README にあった物理 RAM 表記 127.3GiB から WSL 割当値へ変更
+- **1. ブラウザ幅への追従**: `.page-wrap--wide` の `max-width: 1240px` を撤廃（`none`）し、`.bench-table` を `width: max-content; min-width: 100%` → **`width: 100%; min-width: 1591px`** に変更。`min-width: max-content` だと列の折返しは無視され、広い画面でも必要幅（約 2.3k px）で固定されたままだった。併せてテキスト系列（機種名 / OS / CPU / 搭載RAM / 推論エンジン / エンジン版 / 計測日 / 備考）と重み名を `white-space: normal` + `word-break: keep-all`（日本語を1文字ずつ割らない）に変更し、文章部だけ `max-width: 900px` を維持
+  - 実測: コンテナ幅 842px(1440) / 1322px(1920) / 1962px(2560) に対し、テーブルは 1591 / 1591 / **1962（横スクロール 0）** と追従
+- **2. 計測日列（右部）**: `measuredAt` を追加。README の「測定日: …」注記から `extractMeasuredDates` で自動抽出し、**Launcher 名と完全一致（前後が名前文字でない）だけ**を対象に「名前の後ろに並ぶ日付の末尾」を採用（`qwen38` が `qwen38swift` に部分一致する誤り、`strataQ3` の 3 段階再計測で最新 2026-10-25 が残らない問題を排除）。「全環境 / 全モード / 一括切替・一括計測」を含む注記はその行頭日付を未確定行へ展開（AI TOP ATOM の 17 行 = 2026-09-24、`qwen38flashnextexl3_3p05` のみ 2026-09-30）。whitebearatom2 は表ヘッダー「実行状況（2026-10-17 時点）」を全行へ（`headerDate`）。不明 6 行は空欄
+- **3. 備考列（最右端）**: `note` を追加（既定は空欄）。JSON を直接編集すれば済み、`fetch-llm-bench.mjs` に**既存 JSON からの引き継ぎ**（`note` は常時、`measuredAt` は自動抽出できなかった行）を実装したので再生成でも消えない
+- **検証**: 15 列描画（`heads` に計測日・備考を確認）、計測日降順で `2026-10-25 → 2026-10-17…`、備考は 37 行すべて空欄、詳細ポップアップに計測日・備考を表示、`npm run build` 成功、コンソールエラーなし

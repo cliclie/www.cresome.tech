@@ -10,13 +10,16 @@ import Home from './pages/Home';
 import Business from './pages/Business';
 import Flow from './pages/Flow';
 import Company from './pages/Company';
+import Articles from './pages/Articles';
 import { START_POINT_IDS } from './data/stationPoints';
+import { LATEST_ARTICLE_DATE } from './data/articles/index.js';
 
 const PAGES = [
   { id: 'home', label: 'トップ', Component: Home },
   { id: 'business', label: '事業内容', Component: Business },
   { id: 'flow', label: '開発フロー', Component: Flow },
   { id: 'company', label: '会社概要', Component: Company },
+  { id: 'articles', label: '記事', Component: Articles, spaced: true },
 ];
 
 // 地図モードのデフォルト設定
@@ -129,6 +132,9 @@ export default function App() {
     id: p.id,
     label: p.label,
     active: p.id === current,
+    // 「記事」は他の並びより間隔を広げ、直下に最新更新日を表示する
+    spaced: !!p.spaced,
+    sublabel: p.id === 'articles' ? LATEST_ARTICLE_DATE : '',
   }));
 
   const updateMapConfig = (updates) => {
@@ -284,7 +290,7 @@ export default function App() {
             </div>
           </>
         )}
-        <div className="page-wrap">
+        <div className={'page-wrap' + (current === 'articles' ? ' page-wrap--wide' : '')}>
           {PAGES.map(({ id, Component }) => (
             <section
               key={id}

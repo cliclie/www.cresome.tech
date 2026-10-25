@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "npm run build && node scripts/deploy.mjs",
+    "bench:fetch": "node scripts/fetch-llm-bench.mjs",
     "audit": "npm audit --audit-level=high",
     "approve:scripts": "npm install-scripts approve puppeteer"
   },
