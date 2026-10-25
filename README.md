@@ -301,3 +301,9 @@ three.js で読み込める GLB レイヤー群と最短経路を生成します
 - **2. 計測日列（右部）**: `measuredAt` を追加。README の「測定日: …」注記から `extractMeasuredDates` で自動抽出し、**Launcher 名と完全一致（前後が名前文字でない）だけ**を対象に「名前の後ろに並ぶ日付の末尾」を採用（`qwen38` が `qwen38swift` に部分一致する誤り、`strataQ3` の 3 段階再計測で最新 2026-10-25 が残らない問題を排除）。「全環境 / 全モード / 一括切替・一括計測」を含む注記はその行頭日付を未確定行へ展開（AI TOP ATOM の 17 行 = 2026-09-24、`qwen38flashnextexl3_3p05` のみ 2026-09-30）。whitebearatom2 は表ヘッダー「実行状況（2026-10-17 時点）」を全行へ（`headerDate`）。不明 6 行は空欄
 - **3. 備考列（最右端）**: `note` を追加（既定は空欄）。JSON を直接編集すれば済み、`fetch-llm-bench.mjs` に**既存 JSON からの引き継ぎ**（`note` は常時、`measuredAt` は自動抽出できなかった行）を実装したので再生成でも消えない
 - **検証**: 15 列描画（`heads` に計測日・備考を確認）、計測日降順で `2026-10-25 → 2026-10-17…`、備考は 37 行すべて空欄、詳細ポップアップに計測日・備考を表示、`npm run build` 成功、コンソールエラーなし
+### 2026-10-25: ドキュメント整備と公開（記事セクション）
+
+- **ドキュメント整備**: 記事機能の詳細（画面構成・記事追加手順・データ生成と3台のソース・一覧の列/固定/幅追従/ソート仕様・数値の代表値ルール・計測日と備考の運用・既知の制限・検証履歴）を **[ARTICLES.md](./ARTICLES.md)** に集約し、README の「記事」セクションは要約＋リンクへ整理（`WAVE.md` / `SPACESHIP.md` / `MAP.md` と同じ流儀に揃えた）
+- **リポジトリの残務も併せてコミット**: 一時ログの無視（`.gitignore` に `dev_server.log` / `__*.log`）、Tailwind CSS v4 移行で参照されなくなった `tailwind.config.js` / `postcss.config.js` の削除（前回の遺漏）、`.clinerules/00-ClineTips.md` の追補
+- **公開（実施済み 2026-10-25）**: `main` へ 4 コミット（`b05b69d` chore(gitignore) → `3bcb85d` chore → `e7c8ed6` docs(clinerules) → `c22388a` feat(articles)）を push（`ae87e25..c22388a`）。`npm run deploy` は vite 8.3.5 でビルド（245 ms、JS 906.50 kB・gzip 246.62 kB / llm-bench 54.63 kB・gzip 9.98 kB / CSS 26.17 kB・gzip 6.20 kB）後に `publish` へ `9af1c01` を push（`assets/index-BhHvqITJ.js` / `assets/index-DJdGyglj.css` / `assets/llm-bench-D0whHpqR.js` を追加、旧 `index-BNrUcqLq.js` / `index-C0Fhbv6a.css` を削除）
+  - https://www.cresome.tech/ の `index.html` が新ハッシュを参照すること、main JS と llm-bench チャンクが 200 を返すこと（初回リクエストは Pages の配信遅延で 404、45 秒後に 200 を確認）、両アセットに `192.168` が 0 件であることを実測で確認
