@@ -13,5 +13,7 @@ Thumbs.db
 
 # temporary log
 preview.log
+dev_server.log
+__*.log
 .clinerules/01-always.md
 map/.clinerules/
