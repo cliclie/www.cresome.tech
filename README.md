@@ -313,4 +313,5 @@ three.js で読み込める GLB レイヤー群と最短経路を生成します
 - **変更**: `llm-bench.json` が 37 → 38 行（atom2: 5 → 6 行。新行は `strata` = decode 60.47 / prefill 191.38 T/s・順位 13）。`src/data/articles/index.js` の記事日を 2026-10-26 に更新。本 README の記事説明を「38 環境」に更新。ARTICLES.md に strata の計測日補正の運用注記を追記
 - **計測日補正**: `headerDate` は atom2 全行に表ヘッダー「実行状況（2026-10-17 時点）」を適用するが、strata は 2026-10-26 に計測・追加されているため JSON を直接 2026-10-26 に補正（再生成すると 2026-10-17 に戻るため再補正が必要。ARTICLES.md 参照）
 - **検証**: `npm run build` 成功（JS 906.50 kB・gzip 246.62 kB / llm-bench 56.66 kB・gzip 10.49 kB / CSS 26.17 kB・gzip 6.20 kB）。バンドルに strata 行と数値が含まれること、dist に `192.168` が 0 件であることを確認
-- **公開（実施済み 2026-10-26）**: 追記済み
+- **公開（実施済み 2026-10-26）**: `main` へ `7373860` を push（`0e5d91e..7373860`）。`npm run deploy` は vite 8.3.5 で再ビルド（244 ms、JS 906.50 kB・gzip 246.62 kB / llm-bench 56.66 kB・gzip 10.49 kB / CSS 26.17 kB・gzip 6.20 kB）後に `publish` へ `1694f2d` を push（`assets/index-BFpJY82V.js` / `assets/llm-bench-0lNqhiJq.js` へ更新、旧 `index-BhHvqITJ.js` / `llm-bench-D0whHpqR.js` を削除）
+  - https://www.cresome.tech/ の `index.html` が新ハッシュを参照すること、main JS と llm-bench チャンクが 200 を返すこと、両アセットに strata 行（`atom2:strata` / `Qwen3.8-Flash-Next`）が含まれ `192.168` が 0 件であることを実測で確認（反映は push 後約 1 分）
