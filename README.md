@@ -115,7 +115,7 @@ publish ブランチには以下のファイルのみ存在します:
 
 - メニューは「トップ」〜「会社概要」より間隔を広げ、直下に記事の最新更新日を表示します（`Sidebar.jsx` / `Drawer.jsx` 共通、`.nav-group--spaced` と `.nav-sub`）
 - 記事の追加は、本文を `src/pages/articles/` に置いて `src/data/articles/index.js` の `ARTICLES` に登録するだけ（メニュー側の変更不要）
-- **記事1「ローカル環境でローカルLLMをローカルな条件でベンチマーク」**: 自社内 3 台（AI TOP ATOM / whitebearatom2 / Whitebear2026）の環境設定リポジトリの README から `npm run bench:fetch`（`scripts/fetch-llm-bench.mjs`）が生成した 37 環境の一覧。15 列（順位・モデル名・重み名・decode・prefill・コンテキスト長・使用メモリ・機種名・OS・CPU・搭載RAM・推論エンジン・エンジン版・計測日・備考）を全列ソートでき、ヘッダー行と先頭 2 列は固定、行クリックで詳細諸元をポップアップします。一覧はブラウザ幅に追従し、社内 IP は公開バンドルに含めません
+- **記事1「ローカル環境でローカルLLMをローカルな条件でベンチマーク」**: 自社内 3 台（AI TOP ATOM / whitebearatom2 / Whitebear2026）の環境設定リポジトリの README から `npm run bench:fetch`（`scripts/fetch-llm-bench.mjs`）が生成した 38 環境の一覧。15 列（順位・モデル名・重み名・decode・prefill・コンテキスト長・使用メモリ・機種名・OS・CPU・搭載RAM・推論エンジン・エンジン版・計測日・備考）を全列ソートでき、ヘッダー行と先頭 2 列は固定、行クリックで詳細諸元をポップアップします。一覧はブラウザ幅に追従し、社内 IP は公開バンドルに含めません
 
 ## 背景エフェクト
 
@@ -307,3 +307,10 @@ three.js で読み込める GLB レイヤー群と最短経路を生成します
 - **リポジトリの残務も併せてコミット**: 一時ログの無視（`.gitignore` に `dev_server.log` / `__*.log`）、Tailwind CSS v4 移行で参照されなくなった `tailwind.config.js` / `postcss.config.js` の削除（前回の遺漏）、`.clinerules/00-ClineTips.md` の追補
 - **公開（実施済み 2026-10-25）**: `main` へ 4 コミット（`b05b69d` chore(gitignore) → `3bcb85d` chore → `e7c8ed6` docs(clinerules) → `c22388a` feat(articles)）を push（`ae87e25..c22388a`）。`npm run deploy` は vite 8.3.5 でビルド（245 ms、JS 906.50 kB・gzip 246.62 kB / llm-bench 54.63 kB・gzip 9.98 kB / CSS 26.17 kB・gzip 6.20 kB）後に `publish` へ `9af1c01` を push（`assets/index-BhHvqITJ.js` / `assets/index-DJdGyglj.css` / `assets/llm-bench-D0whHpqR.js` を追加、旧 `index-BNrUcqLq.js` / `index-C0Fhbv6a.css` を削除）
   - https://www.cresome.tech/ の `index.html` が新ハッシュを参照すること、main JS と llm-bench チャンクが 200 を返すこと（初回リクエストは Pages の配信遅延で 404、45 秒後に 200 を確認）、両アセットに `192.168` が 0 件であることを実測で確認
+### 2026-10-26: ローカルLLMベンチマーク記事に whitebearatom2 の strata を追加（37 → 38 環境）
+
+- **契機**: `Atom2LLM` の README が 2026-10-26 に `strata`（Qwen3.8-Flash-Next IQ3_XXS / Strata 0.2.3・HIP gfx1201）を追加したため、`npm run bench:fetch` を再実行して記事データを再生成（Gitea 2 台は匿名 HTTP、GitHub は SSH clone・いずれも成功）
+- **変更**: `llm-bench.json` が 37 → 38 行（atom2: 5 → 6 行。新行は `strata` = decode 60.47 / prefill 191.38 T/s・順位 13）。`src/data/articles/index.js` の記事日を 2026-10-26 に更新。本 README の記事説明を「38 環境」に更新。ARTICLES.md に strata の計測日補正の運用注記を追記
+- **計測日補正**: `headerDate` は atom2 全行に表ヘッダー「実行状況（2026-10-17 時点）」を適用するが、strata は 2026-10-26 に計測・追加されているため JSON を直接 2026-10-26 に補正（再生成すると 2026-10-17 に戻るため再補正が必要。ARTICLES.md 参照）
+- **検証**: `npm run build` 成功（JS 906.50 kB・gzip 246.62 kB / llm-bench 56.66 kB・gzip 10.49 kB / CSS 26.17 kB・gzip 6.20 kB）。バンドルに strata 行と数値が含まれること、dist に `192.168` が 0 件であることを確認
+- **公開（実施済み 2026-10-26）**: 追記済み

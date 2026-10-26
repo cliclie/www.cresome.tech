@@ -75,7 +75,7 @@ npm run bench:fetch
   - 同じ名前の再計測が複数書かれると**後勝ち**（`strataQ3` = 2026-10-25）
   - whitebearatom2 は「測定日」注記が無いため、表ヘッダー「実行状況（2026-10-17 時点）」を `headerDate` で全行に適用
 - `note`（備考）は自動生成しません（既定は空欄）。
-- **手動追記は再生成でも消えません**: `fetch-llm-bench.mjs` が既存 JSON を読み、`note` は常時、`measuredAt` は自動抽出できなかった行について既存値を維持します。`Whitebear2026` の `strata15` / `strataS4` / `strataU4` / `llmjp` / `qwen9` / `exl` の計測日は、README に個別記載が無いため JSON を直接編集して補ってください。
+- **手動追記は再生成でも消えません**: `fetch-llm-bench.mjs` が既存 JSON を読み、`note` は常時、`measuredAt` は自動抽出できなかった行について既存値を維持します。`Whitebear2026` の `strata15` / `strataS4` / `strataU4` / `llmjp` / `qwen9` / `exl` の計測日は、README に個別記載が無いため JSON を直接編集して補ってください。`whitebearatom2` の `strata`（2026-10-26 追加）は表ヘッダーの日付（2026-10-17）が更新されないため、README 本文の 2026-10-26 を JSON で直接補正しています（`bench:fetch` 再生成すると 2026-10-17 に戻るため、実行後に再補正してください）。
 
 ## 既知の制限
 
@@ -98,3 +98,8 @@ npm run bench:fetch
 - 搭載RAM: whitebearatom2 = 32GB、Whitebear2026 = 86GB（WSL 割当）に確定
 - 一覧をブラウザ幅に追従（`max-width: none` + `width: 100%` / `min-width: 1591px`）。実測 1440→1591/842、1920→1591/1322、2560→**1962/1962（横スクロール 0）**
 - 計測日・備考の 2 列を追加（37 行で計測日あり 31 / 空欄 6、備考は全行空欄）。計測日降順は `2026-10-25 → 2026-10-17 …`
+
+### 2026-10-26 strata 追加（whitebearatom2）
+- `npm run bench:fetch` を再実行して再生成: 37 → 38 行（atom2: 5 → 6 行）。新行は `strata`（Qwen3.8-Flash-Next IQ3_XXS / Strata 0.2.3・decode 60.47 / prefill 191.38 T/s・順位 13）
+- 表ヘッダー「2026-10-17 時点」が strata 追加後に更新されていないため、strata の計測日は JSON で直接 2026-10-26 に補正（上記「計測日と備考の運用」参照）
+- 記事日を 2026-10-26 に更新。`npm run build` 成功、dist に `192.168` が 0 件

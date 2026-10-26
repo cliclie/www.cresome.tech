@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-25",
+  "generatedAt": "2026-10-26",
   "note": "自社内のローカルLLM環境 3台で実測した推論性能の一覧。数値は各環境設定リポジトリ README の集計値（decode 500 トークン / prefill 約 10,800 トークン 基準）。環境状態が異なる値は比較できないため、絶対値の比較は同一セッションの対測値に限る。",
   "machines": [
     {
@@ -50,7 +50,7 @@
       "machineKey": "atom2",
       "machine": "whitebearatom2",
       "url": null,
-      "rows": 5
+      "rows": 6
     },
     {
       "machineKey": "wb2026",
@@ -601,6 +601,50 @@
       "rank": 12
     },
     {
+      "id": "atom2:strata",
+      "machineKey": "atom2",
+      "machine": "whitebearatom2",
+      "launcher": "strata",
+      "model": "Qwen3.8-Flash-Next（MoE 512experts/10活性。Flash-Next は 27B dense とは別モデル。Strata は dense 非対応のため既存 GGUF は流用不可）",
+      "modelId": null,
+      "weights": "ISTA-DASLab IQ3_XXS（ファイル 75.8GB + pack 42GB + MTP draft 6.5GB。Strata 自動 DL）",
+      "weightSize": null,
+      "decode": 60.47,
+      "decodeText": "—",
+      "prefill": 191.38,
+      "prefillText": "—",
+      "context": 131072,
+      "contextText": "131,072",
+      "memoryKind": "VRAM",
+      "memoryNote": "ディスクリート GPU の実測 VRAM（32.6GB 中・sysfs サンプリング）",
+      "memory": 34.14,
+      "memoryText": "34.14GB（実測）",
+      "engine": "Strata",
+      "engineVersion": "0.2.3",
+      "engineText": "Strata 0.2.3 / engine 0.1.48 HIP（rx9070 パッケージ = gfx1200/1201。R9700 実機スモーク実績あり。イメージ ghcr.io/niko1221/strata:latest-rocm-gfx120x）",
+      "speculative": "—",
+      "measuredAt": "2026-10-26",
+      "note": "",
+      "port": "8009",
+      "os": "Ubuntu 26.04",
+      "cpu": "Intel Core i9-12900KF",
+      "ram": "32GB",
+      "gpu": "AMD Radeon AI PRO R9700 32GB（gfx1201 / RDNA4）",
+      "sourceUrl": null,
+      "raw": {
+        "切替コマンド": "./strata.sh",
+        "サービス": "strata",
+        "モデル": "Qwen3.8-Flash-Next（MoE 512experts/10活性。Flash-Next は 27B dense とは別モデル。Strata は dense 非対応のため既存 GGUF は流用不可）",
+        "量子化": "ISTA-DASLab IQ3_XXS（ファイル 75.8GB + pack 42GB + MTP draft 6.5GB。Strata 自動 DL）",
+        "エンジン": "Strata 0.2.3 / engine 0.1.48 HIP（rx9070 パッケージ = gfx1200/1201。R9700 実機スモーク実績あり。イメージ ghcr.io/niko1221/strata:latest-rocm-gfx120x）",
+        "最大コンテキスト": "131,072",
+        "KVキャッシュ": "int8（既定。KV も GPU に寄せる tuning 済み）",
+        "APIポート": "8009",
+        "実行状況": "✅ 起動可（decode 60.47 T/s・prefill 191.38 T/s（TUNE=quick。skip 既定では 53.98/94.43）。VRAM 31.8/31.9GiB 满载・RAM 23GiB。RAM 30GB は全 expert に不足し SSD ストリーム動作のため prefill は他エンジン比で低速。/v1/* は Bearer 認証必須）"
+      },
+      "rank": 13
+    },
+    {
       "id": "wb2026:llmjp",
       "machineKey": "wb2026",
       "machine": "Whitebear2026",
@@ -643,7 +687,7 @@
         "prefill": "2,142 T/s（41,407 tok 投入）",
         "Port": "8060"
       },
-      "rank": 13
+      "rank": 14
     },
     {
       "id": "atom1:qwen38flashnextexl3",
@@ -688,7 +732,7 @@
         "prefill": "1,119.2 T/s",
         "Port": "8009"
       },
-      "rank": 14
+      "rank": 15
     },
     {
       "id": "atom2:gptoss",
@@ -732,7 +776,7 @@
         "APIポート": "8008",
         "実行状況": "✅ 起動可（decode 55.04 T/s・prefill 2,832.74 T/s。117K NIAH PASS（229.1s）。2026-10-17 に 1.0.394 へ更新して基準 54.8 T/s を維持）"
       },
-      "rank": 15
+      "rank": 16
     },
     {
       "id": "atom2:qwen38radiance",
@@ -776,7 +820,7 @@
         "APIポート": "8005",
         "実行状況": "✅ 起動可（decode 52.99 T/s・prefill 1,619.78 T/s。MTP 受理率 77.4%。60K NIAH PASS。2026-10-17 に 1.0.387→1.0.394 で decode 26.01→52.99 T/s へ向上）"
       },
-      "rank": 16
+      "rank": 17
     },
     {
       "id": "atom1:qwen38flashnextexl3_3p05",
@@ -821,7 +865,7 @@
         "prefill": "1,025.2 T/s",
         "Port": "8011"
       },
-      "rank": 17
+      "rank": 18
     },
     {
       "id": "atom2:qwen38gguf",
@@ -865,7 +909,7 @@
         "APIポート": "8007",
         "実行状況": "✅ 起動可（decode 45.93 T/s・prefill 811.55 T/s。MTP 受理率 45.6%。250K NIAH PASS（コールド 833.6s・再送 0.8s）。2026-10-17 に b11486→b11700、同一環境対測で速度・受理率とも完全一致＝退行なし。250K ピーク VRAM 31,366MB（+163MB））"
       },
-      "rank": 18
+      "rank": 19
     },
     {
       "id": "atom1:qwen38flashnextexl3_4p05",
@@ -910,7 +954,7 @@
         "prefill": "1,058.5 T/s",
         "Port": "8016"
       },
-      "rank": 19
+      "rank": 20
     },
     {
       "id": "atom1:qwen38flashnext_nvfp4",
@@ -955,7 +999,7 @@
         "prefill": "2,566.9 T/s",
         "Port": "8015"
       },
-      "rank": 20
+      "rank": 21
     },
     {
       "id": "atom2:magn",
@@ -999,7 +1043,7 @@
         "APIポート": "10100",
         "実行状況": "✅ 起動可（decode 30.52/28.87 T/s・prefill 573.88/570.70 T/s。実 VRAM 23.1GB・空き 9.5GB。60K NIAH PASS。2026-10-17 に 0.2.7→0.2.9 で速度 -3〜-6% と引き換えに VRAM -1.3GB。Vision は不可）"
       },
-      "rank": 21
+      "rank": 22
     },
     {
       "id": "atom1:qwen38sglangdspark",
@@ -1044,7 +1088,7 @@
         "prefill": "2,083.6 T/s",
         "Port": "8008"
       },
-      "rank": 22
+      "rank": 23
     },
     {
       "id": "atom1:qwen38sglangdflash",
@@ -1089,7 +1133,7 @@
         "prefill": "1,800.4 T/s",
         "Port": "8008"
       },
-      "rank": 23
+      "rank": 24
     },
     {
       "id": "atom1:Muse",
@@ -1134,7 +1178,7 @@
         "prefill": "799.2 T/s",
         "Port": "8004"
       },
-      "rank": 24
+      "rank": 25
     },
     {
       "id": "atom1:qwen38sglangeagle",
@@ -1179,7 +1223,7 @@
         "prefill": "2,245.7 T/s",
         "Port": "8008"
       },
-      "rank": 25
+      "rank": 26
     },
     {
       "id": "atom1:qwen38nvfp4",
@@ -1224,7 +1268,7 @@
         "prefill": "1,508.6 T/s",
         "Port": "8007"
       },
-      "rank": 26
+      "rank": 27
     },
     {
       "id": "atom1:qwen38",
@@ -1269,7 +1313,7 @@
         "prefill": "776.4 T/s†",
         "Port": "8005"
       },
-      "rank": 27
+      "rank": 28
     },
     {
       "id": "atom1:qwen38swift_dflash",
@@ -1314,7 +1358,7 @@
         "prefill": "1,254.4 T/s",
         "Port": "8012"
       },
-      "rank": 28
+      "rank": 29
     },
     {
       "id": "atom1:mimo9b",
@@ -1359,7 +1403,7 @@
         "prefill": "3,806.6 T/s†",
         "Port": "8014"
       },
-      "rank": 29
+      "rank": 30
     },
     {
       "id": "atom1:qwen38bf16",
@@ -1404,7 +1448,7 @@
         "prefill": "1,316.4 T/s†",
         "Port": "8006"
       },
-      "rank": 30
+      "rank": 31
     },
     {
       "id": "atom1:qwen38sglang",
@@ -1449,7 +1493,7 @@
         "prefill": "2,364.5 T/s",
         "Port": "8008"
       },
-      "rank": 31
+      "rank": 32
     },
     {
       "id": "atom1:qwen38swift",
@@ -1494,7 +1538,7 @@
         "prefill": "1,278.6 T/s†",
         "Port": "8012"
       },
-      "rank": 32
+      "rank": 33
     },
     {
       "id": "atom1:glm53flash_mosaic",
@@ -1539,7 +1583,7 @@
         "prefill": "292.4 T/s",
         "Port": "8017"
       },
-      "rank": 33
+      "rank": 34
     },
     {
       "id": "wb2026:swiftqwen38",
@@ -1584,7 +1628,7 @@
         "prefill": "252K を ~154 秒（~1,650 T/s）",
         "Port": "8040"
       },
-      "rank": 34
+      "rank": 35
     },
     {
       "id": "atom2:qwen38sglangrocm",
@@ -1628,7 +1672,7 @@
         "APIポート": "8006",
         "実行状況": "❌ ロード失敗（起動不可）。AWQ は gptq_marlin_repack が ROCm ビルドに無し。MXFP4 は AITER の is_fp4_avail() が gfx950/gfx1250 限定で gfx1201 は MXFP4 is not available on your device。2026-10-06 に再現確認"
       },
-      "rank": 35
+      "rank": 36
     },
     {
       "id": "wb2026:qwen9",
@@ -1673,7 +1717,7 @@
         "prefill": "—",
         "Port": "5003"
       },
-      "rank": 36
+      "rank": 37
     },
     {
       "id": "wb2026:exl",
@@ -1718,7 +1762,7 @@
         "prefill": "—",
         "Port": "8888"
       },
-      "rank": 37
+      "rank": 38
     }
   ]
 }

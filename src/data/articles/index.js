@@ -9,7 +9,7 @@ export const ARTICLES = [
   {
     id: 'local-llm-benchmark',
     title: 'ローカル環境でローカルLLMをローカルな条件でベンチマーク',
-    date: '2026-10-25',
+    date: '2026-10-26',
     summary: '自社内3台のローカル環境で実測した推論性能の一覧',
     Body: LocalLlmBench,
   },
