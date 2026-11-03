@@ -11,7 +11,7 @@ Clineで作業を行うときの所作
    デタッチしたつもりだった起動中の長時間プロセスまで巻き込んで殺される
    （ログが途中行で途切れ、失敗メッセージすら残らないので原因が分かりにくい）。
    起動に数分かかるもの（Strata のモデルロード等）は
-   `setsid nohup <cmd> > /tmp/x.log 2>&1 < /dev/null &` でセッションを分離して**起動コマンドは即返し**
+   `setsid nohup <cmd> > /tmp/x.log 2>&1 < /dev/null &` でセッションを分離して**起動コマンドは即返し**、
    完了待ちの sleep は入れず、状態だけ別コマンドで20秒未満ごとに poll する。
 
 -- 30秒以内に確実に返すには `timeout 25 <cmd>` で明示的に切る手もある（stop.sh 等の短時間確認に有効）。
@@ -20,7 +20,7 @@ Clineで作業を行うときの所作
 
 -- 同じコマンドを6回実行する前にpwd等の影響がないコマンドを空実行するか、clineが成功と判定するコマンドを実行すること。
 
-run_commands は「書き方」で回避できる
+## run_commands は「書き方」で回避できる
 
 -- 引数のゲート（zod）が厳格で、`commands` は**文字列の配列**しか通らない。要素をオブジェクトにすると
    キー名を問わず `{"error":"✖ Invalid input"}` で呼び出し全体が死ぬ
@@ -57,3 +57,10 @@ run_commands は「書き方」で回避できる
 -- ワークスペースルートの .gitignore が /sociax/ を除外しているため、search_codebase の索引対象はワークスペース直下の追跡ファイル(約150件)のみで、sociax/front・back・time-tracking のソース(約4,000ファイル)は対象外。
 -- sociax/ 関連の検索で "No results found (Searched 127 files)" 等が返っても「文字列が存在しない」ではない。sociax/ のコード検索は grep(run_commands) / CodeGraph(シンボル・正規表現) / SociaX RAG(意味検索)を使うこと。
 -- 補足: CodeGraph の検索はシンボル単位のため、Vue テンプレ内の文字列・Mapper XML・.properties・.sql はヒットしない。行単位・全ファイル型の正確一致が必要なら grep にフォールバックする。
+
+# LLM Thinking & Output Constraints
+- **Do not output loose markdown formatting inside `<thinking>` tags.** Never use triple backticks (```) or unclosed symbols inside the thinking block, as it may break the parser or cause a token timeout.
+- **Ensure to close the `</thinking>` tag promptly.** Keep the inner thought process concise and actionable. Do not wander or repeat the same logical loops infinitely.
+- **Do not write full code snippets inside `<thinking>`.** Only outline the logic. Actual code modifications must be deferred to the text outside or inside specific tool calls.
+- **Avoid over-thinking on simple tasks.** If the next step is obvious, immediately close the `</thinking>` block and execute the appropriate tool or respond to the user.
+- **Strictly enforce structured outputs.** If you need to reason in Japanese, do so cleanly, but ensure that all XML-like tags (e.g., `<thinking>`, `</thinking>`) remain perfectly intact in raw English syntax without any modifications or trailing text.
