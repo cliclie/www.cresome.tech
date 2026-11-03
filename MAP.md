@@ -68,6 +68,7 @@
 - データソース: PLATEAU 都市モデル（国土交通省）文京区・豊島区 2025 年度版 CityGML（建物・道路・水部・DEM）+ OpenStreetMap（Overpass API: 都電荒川線・停留所・公園・highway ways）+ クリサム社屋座標（Google Maps、クライアント提供）
 - 座標系: 当地平面座標（ENU、単位 m）。原点は `map/src/config.py` の CENTER（WGS84 35.721N / 139.7220E）、X=東 / Y=北 / Z=上。three.js 読み込み時は `group.rotation.x = -Math.PI/2` で Y-up 変換。
 - 生成: `python src/pipeline.py`（`--no-buildings` で建物除く高速実行も可）で 9 GLB レイヤー群 + `manifest.json` を生成、`python src/routes.py` で 10 起点 → クリサムの最短経路（OSM 道路ネットワーク上の Dijkstra 法）を `routes.json` に出力。
+- 生成環境: Python 3.10+ と `map/requirements.txt` の依存（lxml 6.1.3 / requests 2.34.2 / urllib3 2.8.0 など）。CityGML を `lxml.etree.iterparse()` で読むため、XXE 抑止に `resolve_entities="internal"` を明示している（CVE-2026-41066）。依存の版数・advisory 対応・監査手順は [`map/README.md`](./map/README.md)「依存パッケージと脆弱性監査」参照。
 - 成果物: `map/out/`（通常カラーパレット）と `map/out_white/`（白地図風パレット: 建物 #CFCFCF / 道路 白 / 路線 #5A5A50 / クリサム #E94B3A。`python src/pipeline.py --palette white --out out_white`）。
 - サイトへの反映: `public/map/`（`out_white/` のコピー: 9 GLB + `manifest.json` + `routes.json`）を `MapBackground.jsx` が `GLTFLoader` で読み込み。
 - 旧合成データ `src/data/otsuka-map.json` と `scripts/generate-map-data.mjs` は使用せず、当面ファイルは保持中。

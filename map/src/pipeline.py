@@ -185,7 +185,14 @@ def parse_buildings(cb: box):
         if env and not box(env[1], env[0], env[3], env[2]).intersects(cb):
             continue
         n_files += 1
-        ctx = etree.iterparse(str(path), events=("end",), tag=f"{{{NS['bldg']}}}Building")
+        # XXE 抑止（CVE-2026-41066 / GHSA-vfmq-68hx-4jfw）: 外部エンティティによる
+        # ローカルファイル読み出しを禁止（lxml 6.1.0+ のデフォルトを明示）
+        ctx = etree.iterparse(
+            str(path),
+            events=("end",),
+            tag=f"{{{NS['bldg']}}}Building",
+            resolve_entities="internal",
+        )
         for _, elem in ctx:
             n_total += 1
             usage_el = elem.find(f"{{{NS['bldg']}}}usage")
@@ -251,7 +258,10 @@ def parse_flat_layer(layer: str, cb: box):
         env = file_envelope(Path(path))
         if env and not box(env[1], env[0], env[3], env[2]).intersects(cb):
             continue
-        ctx = etree.iterparse(str(path), events=("end",), tag=tag)
+        # XXE 抑止（CVE-2026-41066）: resolve_entities は lxml 6.1.0+ のデフォルトを明示
+        ctx = etree.iterparse(
+            str(path), events=("end",), tag=tag, resolve_entities="internal"
+        )
         for _, elem in ctx:
             for p in to_shapely(extract_polygons(elem, geom_tag)):
                 if not p.intersects(cb):

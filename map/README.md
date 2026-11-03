@@ -111,7 +111,7 @@ map/
 # セットアップと実行
 
 ```bat
-:: 1) Python依存のインストール
+:: 1) Python依存のインストール（Python 3.10+ 必須。requests 2.33.0 以降が 3.9 を切りました）
 pip install -r requirements.txt
 
 :: 2) データ取得（初回のみ。数GB級のため時間がかかります）
@@ -265,6 +265,39 @@ cresome.glb          meshes=    1 verts=     50 size= 0.00 MB
 
 検証: `python src/verify_glb.py` で全GLB（terrain含む9ファイル）の読み込み・bbox・頂点色を確認済み。
 ビュワーは `scripts\start_viewer.bat` → http://localhost:8000/viewer/index.html
+
+2026-11-04 に同一環境（Python 3.13.17 / lxml 6.1.3 / trimesh 5.1.1）で再ビルドした実測は `buildings: files=9/47 total=30694 used=17811`、`tran: polygons=5675 / wtr: polygons=822`、`terrain grid: 216x244`、export 計9ファイル（terrain v=52704 / buildings meshes=1 v=229802 8.34 MB / roads v=48065 / lines v=45948 / parks v=17352 / water v=14946 / stations 10本 v=500 / cresome v=50 / cresome_building v=8）、所要45秒です。上表は 2026-09-06 時点の値で、buildings・roads・parks・water のメッシュ数と頂点数が現行コードの実測と異なります（線画レイヤーを分離した旧構成の名残）。
+
+# 依存パッケージと脆弱性監査（2026-11-04）
+
+`requirements.txt` はすべて下限指定（`>=`）で、ロックファイルは持っていません。`pip install -r requirements.txt` が PyPI の最新版を解決するため、実環境の版が宣言より先行しても何も警告は出ません。宣言と実環境（Python 3.13.17）を揃えた状態が下表です。
+
+| パッケージ | 宣言 | 実環境 | 直近の advisory |
+|---|---|---|---|
+| lxml | `>=6.1.3` | 6.1.3 | CVE-2026-41066 / GHSA-vfmq-68hx-4jfw（**HIGH 7.5**・XXE）→ 6.1.0 で修正 |
+| requests | `>=2.34.2` | 2.34.2 | CVE-2026-25645 / GHSA-gc5v-m9x4-r6x2（MODERATE・一時ファイル再利用）→ 2.33.0 で修正。**要 Python 3.10+** |
+| pygltflib | `>=1.16.5` | 1.16.5 | なし |
+| urllib3 | `>=2.8.0` | 2.8.0 | GHSA-8988-9cw3-xx77 ほか3件 → 2.8.0 で修正（2026-10-23 に対応済み） |
+| certifi | `>=2026.10.19` | 2026.10.19 | GHSA-6q48-6c7w-9gw2（漏洩した emSign ルート CA を同梱）→ 2026.10.19 で修正 |
+| numpy / pyproj / shapely / trimesh | `>=2.5.4` / `>=3.8` / `>=2.2` / `>=5.1.1` | 2.5.4 / 3.8.0 / 2.2.0 / 5.1.1 | なし |
+
+## CityGML パースの XXE 対策
+
+`src/pipeline.py` は PLATEAU の CityGML（外部配布データ）を `lxml.etree.iterparse()` で読みます。lxml 6.0 までは `iterparse()` の `resolve_entities` が既定 `True` で、XML 内の外部エンティティ宣言からローカルファイルを読み出せました（CVE-2026-41066）。lxml 6.1.0 で全パーサの既定が `internal` になり、既定ではローカルファイルアクセスは不可です。
+
+`parse_buildings`（bldg）と `parse_flat_layer`（tran/wtr）の2箇所で、版数に依存しないことを明示するため `resolve_entities="internal"` を指定しています。
+
+- 実測（lxml 6.1.3）: `resolve_entities=True` はファイル内容が漏洩／`internal`・`False`・既定は抑止（`internal` と既定は未定義エンティティとして `XMLSyntaxError`）
+- 出力への影響: 指定前後で `out/` の GLB 9ファイルの MD5 が**完全一致**（既存成果物と同一）
+
+## 監査の実行
+
+```bat
+python -m pip install pip-audit   :: 初回のみ
+scripts\audit_deps.bat            :: pip-audit -r requirements.txt --desc on
+```
+
+2026-11-04 実行で **No known vulnerabilities found**。Dependabot は `.github/dependabot.yml` の `pip` / `map`（weekly、`open-pull-requests-limit: 3`）で同じ advisory を検出します。上限3枠を使い切ると trimesh / certifi などの更新は PR 化されません。
 
 # カラーカスタマイズ（白地図など）
 
