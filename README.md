@@ -315,3 +315,26 @@ three.js で読み込める GLB レイヤー群と最短経路を生成します
 - **検証**: `npm run build` 成功（JS 906.50 kB・gzip 246.62 kB / llm-bench 56.66 kB・gzip 10.49 kB / CSS 26.17 kB・gzip 6.20 kB）。バンドルに strata 行と数値が含まれること、dist に `192.168` が 0 件であることを確認
 - **公開（実施済み 2026-10-26）**: `main` へ `7373860` を push（`0e5d91e..7373860`）。`npm run deploy` は vite 8.3.5 で再ビルド（244 ms、JS 906.50 kB・gzip 246.62 kB / llm-bench 56.66 kB・gzip 10.49 kB / CSS 26.17 kB・gzip 6.20 kB）後に `publish` へ `1694f2d` を push（`assets/index-BFpJY82V.js` / `assets/llm-bench-0lNqhiJq.js` へ更新、旧 `index-BhHvqITJ.js` / `llm-bench-D0whHpqR.js` を削除）
   - https://www.cresome.tech/ の `index.html` が新ハッシュを参照すること、main JS と llm-bench チャンクが 200 を返すこと、両アセットに strata 行（`atom2:strata` / `Qwen3.8-Flash-Next`）が含まれ `192.168` が 0 件であることを実測で確認（反映は push 後約 1 分）
+
+### 2026-11-04: `map/` Python 依存の下限更新と CityGML パースの XXE 抑止（lxml 6.1.3）
+
+- **契機**: Dependabot が `pip` / `map` で3件の PR を送出（`dependabot/pip/map/requests-gte-2.34.2` / `lxml-gte-6.1.3` / `pygltflib-gte-1.16.5`、2026-10-23作成）。`.github/dependabot.yml` の `open-pull-requests-limit: 3` の上限3枠をちょうど使い切っており、trimesh 5.2.0 や certifi 2026.10.23 の更新が PR 化できない状態だった
+- **advisory 調査（OSV / GitHub reviewed）**:
+  1. `lxml` 5.0 — **CVE-2026-41066 / GHSA-vfmq-68hx-4jfw（HIGH 7.5・CWE-611）**。`iterparse()` と `ETCompatXMLParser()` の既定が `resolve_entities=True` で、信頼できない XML によるローカルファイル読み出しを許す。6.1.0 で既定が `internal` 化。**`map/src/pipeline.py` の2箇所がまさに `etree.iterparse()` を既定オプションで使用**（入力は PLATEAU CityGML = 外部配布データ）
+  2. `requests` 2.32.5 — CVE-2026-25645 / GHSA-gc5v-m9x4-r6x2（MODERATE・CWE-377）。`requests.utils.extract_zipped_paths()` の予測可能な一時ファイル名。上流が「標準的な利用は影響を受けず、この utility を直接呼ぶアプリのみ該当」と明記しており、`map/` は `requests.get/post/head` のみ使用（該当 0件）
+  3. `pygltflib` 1.16 — advisory なし（純粋な版上げ）
+  - いずれも実環境（Python 3.13.17）には既に 6.1.3 / 2.34.2 / 1.16.5 が入っており、**稼働中パイプラインに実害はなかった**。`requirements.txt` の下限宣言だけが古かった
+- **適用内容**:
+  1. `map/requirements.txt` — `lxml>=5.0` → **`>=6.1.3`**、`requests>=2.32.5` → **`>=2.34.2`**、`pygltflib>=1.16` → **`>=1.16.5`**（宣言と実環境を一致させた。requests 2.33.0 以降は Python 3.9 を切るため **Python 3.10+ 必須**）
+  2. `map/src/pipeline.py` — `parse_buildings`（bldg）と `parse_flat_layer`（tran/wtr）の `etree.iterparse()` に **`resolve_entities="internal"` を明示**（版数に依存しない宣言）
+  3. README 手順6どおり `pip-audit 2.10.1` を導入（`map/scripts/audit_deps.bat` が使える）
+- **検証（実施済み）**:
+  1. XXE 挙動の実測（lxml 6.1.3）: `resolve_entities=True` はローカルファイル内容が漏洩／`internal`・`False`・既定は抑止（`internal` と既定は未定義エンティティで `XMLSyntaxError`）
+  2. `python src/pipeline.py` が **45秒で完走**（stderr 空、`buildings: files=9/47 total=30694 used=17811`、`tran: polygons=5675`、`wtr: polygons=822`、terrain grid 216x244）
+  3. **A/B 比較**: `resolve_entities` 指定前（HEAD）と指定後で各1回ビルドし、`out/` の **GLB 9ファイルの MD5 が完全一致**（出力影響ゼロを実証）
+  4. `python src/verify_glb.py` — 全9レイヤーの読み込み・bbox・頂点色 OK（terrain v=52704 / buildings v=229802 / lines v=45948 など）
+  5. `scripts\audit_deps.bat` → **`No known vulnerabilities found`**（2回実行で再現確認）
+  6. 既知の残課題（今回の変更とは無関係）: `src/verify_changes.py` の検査2は `abs(diff) < 1e-3` を要求するが、`map/README.md` の設計値は「道路境界線 = 地形標高 + 0.01m」で**閾値が設計と不整合**（実測 `diff_abs_max=0.0101`）。加えて同スクリプトは `out_white/` 参照で、そちらは 2026-09-06 のまま未再生成。別途対応が必要
+- **ドキュメント整備**: `map/README.md` に「**依存パッケージと脆弱性監査（2026-11-04）**」節（宣言 / 実環境 / advisory の対応表、CityGML パースの XXE 対策、監査実行手順）と 2026-11-04 再ビルド実測の追記、`MAP.md`「データパイプライン（map/）」に生成環境（Python 3.10+・XXE 抑止）の注記を追加
+- **公開（実施済み 2026-11-04）**: `main` へ2コミットを push（`c05f252..0a44b1f` = `2e329ea` chore(deps) → `0a44b1f` docs(clinerules)）。`npm run deploy` は vite 8.3.5 でビルド成功（297 ms、JS 906.50 kB・gzip 246.62 kB / llm-bench 56.66 kB・gzip 10.49 kB / CSS 26.17 kB・gzip 6.20 kB）したが、**生成物が 2026-10-26 の `publish 1694f2d` と完全一致**したため `deploy.mjs` が commit/push をスキップ（`map/` の Python 側のみで dist に影響なし。`publish` は `1694f2d` のままが正しい）
+  - https://www.cresome.tech/ が `./assets/index-BFpJY82V.js` と `./assets/index-DJdGyglj.css` を参照し、`index-BFpJY82V.js` 906,507 B / `index-DJdGyglj.css` 26,171 B / `llm-bench-0lNqhiJq.js` 56,667 B（38 環境）の3点がいずれも 200 を返すことを実測確認
