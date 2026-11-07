@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-26",
+  "generatedAt": "2026-11-07",
   "note": "自社内のローカルLLM環境 3台で実測した推論性能の一覧。数値は各環境設定リポジトリ README の集計値（decode 500 トークン / prefill 約 10,800 トークン 基準）。環境状態が異なる値は比較できないため、絶対値の比較は同一セッションの対測値に限る。",
   "machines": [
     {
@@ -44,19 +44,19 @@
       "machineKey": "atom1",
       "machine": "AI TOP ATOM",
       "url": null,
-      "rows": 18
+      "rows": 19
     },
     {
       "machineKey": "atom2",
       "machine": "whitebearatom2",
       "url": null,
-      "rows": 6
+      "rows": 7
     },
     {
       "machineKey": "wb2026",
       "machine": "Whitebear2026",
       "url": null,
-      "rows": 14
+      "rows": 15
     }
   ],
   "rows": [
@@ -125,8 +125,8 @@
       "memory": 26.31,
       "memoryText": "25,861 MiB（24.5GiB・アイドル時／1.4.8 では 28,349 MiB）",
       "engine": "TabbyAPI + ExLlamaV3",
-      "engineVersion": "1.6.3",
-      "engineText": "TabbyAPI a270c55 + exllamav3 1.6.3（2026-10-20 に 1.4.8 から更新）",
+      "engineVersion": "1.6.6",
+      "engineText": "TabbyAPI 3cacaf2 + exllamav3 1.6.6（2026-11-01 に 1.6.3 から更新）",
       "speculative": "内蔵 MTP",
       "measuredAt": "2026-09-24",
       "note": "",
@@ -138,7 +138,7 @@
       "sourceUrl": null,
       "raw": {
         "ランチャー": "swift40",
-        "推論エンジン": "TabbyAPI a270c55 + exllamav3 1.6.3（2026-10-20 に 1.4.8 から更新）",
+        "推論エンジン": "TabbyAPI 3cacaf2 + exllamav3 1.6.6（2026-11-01 に 1.6.3 から更新）",
         "モデル": "Swift-Qwen3.8-27B-EXL3 4.0bpw（erlidev SC_4.00bpw_H5_V6）",
         "重み": "16.35GB",
         "コンテキスト / KV": "262,144 / int8(Q8)",
@@ -149,6 +149,50 @@
         "Port": "5001"
       },
       "rank": 2
+    },
+    {
+      "id": "atom2:qwen38hipfire",
+      "machineKey": "atom2",
+      "machine": "whitebearatom2",
+      "launcher": "qwen38hipfire",
+      "model": "Qwen 3.8 27B",
+      "modelId": "hipfire-models/qwen3.8-27b",
+      "weights": "hipfire 公式 MQ4V2 XT-symmetric 14.99GB + DFlash draft 1.21GB + MTP head 0.23GB + vision tower 0.93GB（HF hipfire-models/qwen3.8-27b。hipfire は GGUF を serve しないため既存 GGUF/MXFP4 は流用不可）",
+      "weightSize": 17.36,
+      "decode": 147.06,
+      "decodeText": "147.06 T/s",
+      "prefill": 4266.54,
+      "prefillText": "4,266.54 T/s",
+      "context": 262144,
+      "contextText": "262,144（card_cap 477,153。placement: fully resident）",
+      "memoryKind": "VRAM",
+      "memoryNote": "ディスクリート GPU の実測 VRAM（32.6GB 中・sysfs サンプリング）",
+      "memory": 18.15,
+      "memoryText": "18.15GB（実測）",
+      "engine": "hipfire 0.4.5（Rust + HIP ネイティブ・gfx1201 WMMA/Redline。ghcr イメージに prebuilt kernel 焼き込み → ビルド不要）",
+      "engineVersion": "0.4.5",
+      "engineText": "hipfire 0.4.5（Rust + HIP ネイティブ・gfx1201 WMMA/Redline。ghcr イメージに prebuilt kernel 焼き込み → ビルド不要）",
+      "speculative": "fp8（kv_cache=auto を gfx1201 で解決。vmm backend）",
+      "measuredAt": "2026-11-01",
+      "note": "",
+      "port": "8011",
+      "os": "Ubuntu 26.04",
+      "cpu": "Intel Core i9-12900KF",
+      "ram": "32GB",
+      "gpu": "AMD Radeon AI PRO R9700 32GB（gfx1201 / RDNA4）",
+      "sourceUrl": null,
+      "raw": {
+        "切替コマンド": "./qwen38hipfire.sh",
+        "サービス": "hipfire",
+        "モデル": "Qwen 3.8 27B",
+        "量子化": "hipfire 公式 MQ4V2 XT-symmetric 14.99GB + DFlash draft 1.21GB + MTP head 0.23GB + vision tower 0.93GB（HF hipfire-models/qwen3.8-27b。hipfire は GGUF を serve しないため既存 GGUF/MXFP4 は流用不可）",
+        "エンジン": "hipfire 0.4.5（Rust + HIP ネイティブ・gfx1201 WMMA/Redline。ghcr イメージに prebuilt kernel 焼き込み → ビルド不要）",
+        "最大コンテキスト": "262,144（card_cap 477,153。placement: fully resident）",
+        "KVキャッシュ": "fp8（kv_cache=auto を gfx1201 で解決。vmm backend）",
+        "APIポート": "8011",
+        "実行状況": "✅ 起動可（decode 147.06 T/s・prefill 4,266.54 T/s（DFlash auto・2026-11-07 計測。AR 41.60 / MTP K=3 58.03 T/s）。既存 5 エンジン中最速。モデルロード 6.2 秒・VRAM 18.15GB。NIAH 120K 41.1s / 250K 133.6s PASS。Vision OK（896×672 画像で図形・色・OCR 4/4 正答。1リクエスト1画像・base64 のみ）"
+      },
+      "rank": 3
     },
     {
       "id": "wb2026:swift35",
@@ -170,8 +214,8 @@
       "memory": 25.6,
       "memoryText": "25.6GB",
       "engine": "TabbyAPI + ExLlamaV3",
-      "engineVersion": "1.6.3",
-      "engineText": "TabbyAPI + exllamav3 1.6.3（数値は 1.4.8 時点の実測）",
+      "engineVersion": "1.6.6",
+      "engineText": "TabbyAPI + exllamav3 1.6.6（数値は 1.4.8 時点の実測）",
       "speculative": "内蔵 MTP",
       "measuredAt": "2026-09-24",
       "note": "",
@@ -183,7 +227,7 @@
       "sourceUrl": null,
       "raw": {
         "ランチャー": "swift35",
-        "推論エンジン": "TabbyAPI + exllamav3 1.6.3（数値は 1.4.8 時点の実測）",
+        "推論エンジン": "TabbyAPI + exllamav3 1.6.6（数値は 1.4.8 時点の実測）",
         "モデル": "Swift-Qwen3.8-27B-EXL3 3.5bpw（SC_3.50bpw_H4_V6）",
         "重み": "14.67GB",
         "コンテキスト / KV": "262,144 / int8(Q8)",
@@ -193,7 +237,7 @@
         "prefill": "—（prompt 59 tok のみ・非代表）",
         "Port": "5002"
       },
-      "rank": 3
+      "rank": 4
     },
     {
       "id": "wb2026:strata15",
@@ -238,7 +282,7 @@
         "prefill": "183,493 tok を 36.6 秒（5,005〜5,013 T/s） / 45K: 3,974 T/s（0.1.40.3: 2,090）",
         "Port": "8080"
       },
-      "rank": 4
+      "rank": 5
     },
     {
       "id": "wb2026:bonsai",
@@ -283,7 +327,7 @@
         "prefill": "2,782〜3,279 T/s",
         "Port": "8081"
       },
-      "rank": 5
+      "rank": 6
     },
     {
       "id": "wb2026:tabby",
@@ -305,8 +349,8 @@
       "memory": 27.7,
       "memoryText": "27.7GB",
       "engine": "TabbyAPI + ExLlamaV3",
-      "engineVersion": "1.6.3",
-      "engineText": "TabbyAPI + exllamav3 1.6.3（数値は 1.4.8 時点の実測）",
+      "engineVersion": "1.6.6",
+      "engineText": "TabbyAPI + exllamav3 1.6.6（数値は 1.4.8 時点の実測）",
       "speculative": "内蔵 MTP",
       "measuredAt": "2026-09-24",
       "note": "",
@@ -318,7 +362,7 @@
       "sourceUrl": null,
       "raw": {
         "ランチャー": "tabby",
-        "推論エンジン": "TabbyAPI + exllamav3 1.6.3（数値は 1.4.8 時点の実測）",
+        "推論エンジン": "TabbyAPI + exllamav3 1.6.6（数値は 1.4.8 時点の実測）",
         "モデル": "Qwen3.8-27B-EXL3 3.5bpw（base）",
         "重み": "14.2GB",
         "コンテキスト / KV": "262,144 / int8(Q8)（KV 約 9.1GB）",
@@ -328,7 +372,7 @@
         "prefill": "1,769 T/s（124,698 prompt）",
         "Port": "5000"
       },
-      "rank": 6
+      "rank": 7
     },
     {
       "id": "wb2026:strataQ3",
@@ -353,7 +397,7 @@
       "engineVersion": "0.1.49.2",
       "engineText": "Strata 0.1.49.2（本機ビルド / sm_120・src b9993e25b7e78735・2026-10-25 に v0.2.4.2 ソースから更新（0.1.46.2→0.1.49.2）。strataQ3 以外は 0.1.43 時点の数値）",
       "speculative": "内蔵 MTP（--spec 4・受理 61〜64%）",
-      "measuredAt": "2026-10-25",
+      "measuredAt": "2026-10-30",
       "note": "",
       "port": "8080",
       "os": "WSL2 Ubuntu 26.04（Windows ホスト）",
@@ -363,7 +407,7 @@
       "sourceUrl": null,
       "raw": {
         "ランチャー": "strataQ3",
-        "推論エンジン": "同上（このモードのみ 0.1.49.2 で再実測＝2026-10-25 の streaming ベンチ。その前は 0.1.46.2 エンジン差し替え A/B＝2026-10-21）",
+        "推論エンジン": "同上（このモードのみ 0.1.55 で再実測＝2026-11-01 の同一セッション A/B。serve を v0.2.9 に固定し engine/ だけ 0.1.54 に戻した分離比較: 長文 20K/28K prefill 2,582.2 → 2,688.0 / 2,814.2 T/s（+4.1 / +2.4%）・code decode 54.77 → 58.61 T/s（+7.0%）・all decode 52.53 → 54.35（+3.5%）・story −0.9%、語彙リスト prefill 1,684.0 → 1,545.1・decode 98.92 → 95.18（−8.2 / −3.8%）と符号が割れ、実負荷（コード・散文・tool call・長文）重視で採用。NIAH 9/9・vision 正答・config 差分ゼロ（生データ strata/bench/2026-11-01-0.1.55/）。その前の 0.1.54＝2026-10-30 は語彙リスト系 decode 72.2 → 64.0 T/s（−11%）、code/story 33.1 → 36.3 T/s（+9.7%）。再構成した bench_strata.py は 10-28 とプロンプト文言が異なるため、上表の 100.0 T/s や 2026-10-28 の記載値と直接比較しない（A/B 専用・比較表 strata/bench/2026-10-30-COMPARISON.md）。その前は 0.1.52＝2026-10-28、0.1.49.2＝2026-10-25、0.1.46.2 エンジン差し替え A/B＝2026-10-21）",
         "モデル": "ukisai Swift 1.5 GSQ-RCO IQ3_S（3.5bit・公式「最高品質（本体と一致）」帯・2026-10-12 追加）",
         "重み": "84GB（Expert 46.84 GiB＝0.1.46.2 では RAM pin 32.39 GiB + VRAM cache 9,033 experts / 17.13 GiB・budget 47・no file reads／同一 A/B の 0.1.45 は pin 32.84 GiB + cache 9,176 / 17.41 GiB）",
         "コンテキスト / KV": "262,144 / int8",
@@ -373,7 +417,7 @@
         "prefill": "183,493 tok を 46.6 秒（3,934 T/s） / 4K prefill 2,166 T/s（同一 A/B の 0.1.45: 1,933／10-20 測定: 2,072） / 3.6K prefill 2,135 T/s（0.1.49.2 streaming ベンチ中央値・0.1.46.2 同一方式: 2,303） / 45K: 3,189 T/s（同一 A/B の 0.1.45: 3,055）",
         "Port": "8080"
       },
-      "rank": 7
+      "rank": 8
     },
     {
       "id": "wb2026:strataC1",
@@ -418,7 +462,51 @@
         "prefill": "366,926 tok を 62.0 秒（5,916 T/s） / 45K: 3,359 T/s",
         "Port": "8080"
       },
-      "rank": 8
+      "rank": 9
+    },
+    {
+      "id": "atom2:strata",
+      "machineKey": "atom2",
+      "machine": "whitebearatom2",
+      "launcher": "strata",
+      "model": "Qwen3.8-Flash-Next（MoE 512experts/10活性。Flash-Next は 27B dense とは別モデル。Strata は dense 非対応のため既存 GGUF は流用不可）",
+      "modelId": null,
+      "weights": "ISTA-DASLab IQ3_XXS（ファイル 75.8GB + pack 42GB + DFlash2 drafter。Strata 自動 DL）",
+      "weightSize": null,
+      "decode": 75.92,
+      "decodeText": "75.92 T/s",
+      "prefill": 1372.14,
+      "prefillText": "1,372.14 T/s",
+      "context": 131072,
+      "contextText": "131,072",
+      "memoryKind": "VRAM",
+      "memoryNote": "ディスクリート GPU の実測 VRAM（32.6GB 中・sysfs サンプリング）",
+      "memory": 34.14,
+      "memoryText": "34.14GB（実測）",
+      "engine": "Strata",
+      "engineVersion": "0.2.11",
+      "engineText": "Strata 0.2.11 / engine 0.1.57 HIP（rx9070 パッケージ = gfx1200/1201。R9700 は maintainer-tested で 0.2.9 以降のリリーステストに本機同構成（Linux x86 1×R9700 + Qwen IQ3_S）が含まれる。イメージ ghcr.io/niko1221/strata:0.2.11-rocm-gfx120x にピン）",
+      "speculative": "int8（既定。KV も GPU に寄せる tuning 済み）",
+      "measuredAt": "2026-11-01",
+      "note": "",
+      "port": "8009",
+      "os": "Ubuntu 26.04",
+      "cpu": "Intel Core i9-12900KF",
+      "ram": "32GB",
+      "gpu": "AMD Radeon AI PRO R9700 32GB（gfx1201 / RDNA4）",
+      "sourceUrl": null,
+      "raw": {
+        "切替コマンド": "./strata.sh",
+        "サービス": "strata",
+        "モデル": "Qwen3.8-Flash-Next（MoE 512experts/10活性。Flash-Next は 27B dense とは別モデル。Strata は dense 非対応のため既存 GGUF は流用不可）",
+        "量子化": "ISTA-DASLab IQ3_XXS（ファイル 75.8GB + pack 42GB + DFlash2 drafter。Strata 自動 DL）",
+        "エンジン": "Strata 0.2.11 / engine 0.1.57 HIP（rx9070 パッケージ = gfx1200/1201。R9700 は maintainer-tested で 0.2.9 以降のリリーステストに本機同構成（Linux x86 1×R9700 + Qwen IQ3_S）が含まれる。イメージ ghcr.io/niko1221/strata:0.2.11-rocm-gfx120x にピン）",
+        "最大コンテキスト": "131,072",
+        "KVキャッシュ": "int8（既定。KV も GPU に寄せる tuning 済み）",
+        "APIポート": "8009",
+        "実行状況": "✅ 起動可（decode 75.92 T/s・prefill 1,372.14 T/s（2026-11-07 A/B 同一セッション対測。warm 状態の 0.2.9（57.29 / 166.68 T/s）に対し decode +32.5%・prefill +723%・TTFT 1.22→0.57s — 0.2.10 で DFlash2 が既定 drafter 化＋0.2.11 の Radeon prompt 改善。本機 prefill は従来 expert の SSD ストリームで律速（82〜198 T/s）だったが、その上限が消えた）。VRAM 31.8/31.9GiB 满载・RAM 23GiB。NIAH 120K PASS（63.4s）・check-services 3項目・tool call 正常。DFlash2 により 1 リクエスト同時に固定（本機の単一運用方針とは整合）。/v1/* は Bearer 認証必須）"
+      },
+      "rank": 10
     },
     {
       "id": "wb2026:strataU4",
@@ -463,7 +551,7 @@
         "prefill": "45,072 tok を 17.3 秒（2,603 T/s） / 183,493 tok を 51.4 秒（3,567 T/s）",
         "Port": "8080"
       },
-      "rank": 9
+      "rank": 11
     },
     {
       "id": "atom1:nemo",
@@ -508,7 +596,7 @@
         "prefill": "2,285.0 T/s",
         "Port": "8000"
       },
-      "rank": 10
+      "rank": 12
     },
     {
       "id": "atom1:glm53flash",
@@ -553,7 +641,7 @@
         "prefill": "645.6 T/s",
         "Port": "8013"
       },
-      "rank": 11
+      "rank": 13
     },
     {
       "id": "wb2026:strataS4",
@@ -598,51 +686,7 @@
         "prefill": "45,072 tok を 20.4 秒（2,209 T/s） / 183,493 tok を 67.8 秒（2,708 T/s）",
         "Port": "8080"
       },
-      "rank": 12
-    },
-    {
-      "id": "atom2:strata",
-      "machineKey": "atom2",
-      "machine": "whitebearatom2",
-      "launcher": "strata",
-      "model": "Qwen3.8-Flash-Next（MoE 512experts/10活性。Flash-Next は 27B dense とは別モデル。Strata は dense 非対応のため既存 GGUF は流用不可）",
-      "modelId": null,
-      "weights": "ISTA-DASLab IQ3_XXS（ファイル 75.8GB + pack 42GB + MTP draft 6.5GB。Strata 自動 DL）",
-      "weightSize": null,
-      "decode": 60.47,
-      "decodeText": "—",
-      "prefill": 191.38,
-      "prefillText": "—",
-      "context": 131072,
-      "contextText": "131,072",
-      "memoryKind": "VRAM",
-      "memoryNote": "ディスクリート GPU の実測 VRAM（32.6GB 中・sysfs サンプリング）",
-      "memory": 34.14,
-      "memoryText": "34.14GB（実測）",
-      "engine": "Strata",
-      "engineVersion": "0.2.3",
-      "engineText": "Strata 0.2.3 / engine 0.1.48 HIP（rx9070 パッケージ = gfx1200/1201。R9700 実機スモーク実績あり。イメージ ghcr.io/niko1221/strata:latest-rocm-gfx120x）",
-      "speculative": "—",
-      "measuredAt": "2026-10-26",
-      "note": "",
-      "port": "8009",
-      "os": "Ubuntu 26.04",
-      "cpu": "Intel Core i9-12900KF",
-      "ram": "32GB",
-      "gpu": "AMD Radeon AI PRO R9700 32GB（gfx1201 / RDNA4）",
-      "sourceUrl": null,
-      "raw": {
-        "切替コマンド": "./strata.sh",
-        "サービス": "strata",
-        "モデル": "Qwen3.8-Flash-Next（MoE 512experts/10活性。Flash-Next は 27B dense とは別モデル。Strata は dense 非対応のため既存 GGUF は流用不可）",
-        "量子化": "ISTA-DASLab IQ3_XXS（ファイル 75.8GB + pack 42GB + MTP draft 6.5GB。Strata 自動 DL）",
-        "エンジン": "Strata 0.2.3 / engine 0.1.48 HIP（rx9070 パッケージ = gfx1200/1201。R9700 実機スモーク実績あり。イメージ ghcr.io/niko1221/strata:latest-rocm-gfx120x）",
-        "最大コンテキスト": "131,072",
-        "KVキャッシュ": "int8（既定。KV も GPU に寄せる tuning 済み）",
-        "APIポート": "8009",
-        "実行状況": "✅ 起動可（decode 60.47 T/s・prefill 191.38 T/s（TUNE=quick。skip 既定では 53.98/94.43）。VRAM 31.8/31.9GiB 满载・RAM 23GiB。RAM 30GB は全 expert に不足し SSD ストリーム動作のため prefill は他エンジン比で低速。/v1/* は Bearer 認証必須）"
-      },
-      "rank": 13
+      "rank": 14
     },
     {
       "id": "wb2026:llmjp",
@@ -687,7 +731,51 @@
         "prefill": "2,142 T/s（41,407 tok 投入）",
         "Port": "8060"
       },
-      "rank": 14
+      "rank": 15
+    },
+    {
+      "id": "atom2:gptoss",
+      "machineKey": "atom2",
+      "machine": "whitebearatom2",
+      "launcher": "gptoss",
+      "model": "GPT-OSS-20B（MoE 36B総/5.1B active）",
+      "modelId": "openai/gpt-oss-20b",
+      "weights": "ネイティブMXFP4（openai公式）",
+      "weightSize": null,
+      "decode": 58.99,
+      "decodeText": "58.99 T/s",
+      "prefill": 3083.26,
+      "prefillText": "3,083.26 T/s",
+      "context": 131072,
+      "contextText": "131,072",
+      "memoryKind": "VRAM",
+      "memoryNote": "ディスクリート GPU の実測 VRAM（32.6GB 中・sysfs サンプリング）",
+      "memory": null,
+      "memoryText": "—",
+      "engine": "vLLM-Radiance",
+      "engineVersion": "1.0.397",
+      "engineText": "vLLM-Radiance 1.0.397（RDNA4 MXFP4カーネル）",
+      "speculative": "—",
+      "measuredAt": "2026-11-01",
+      "note": "",
+      "port": "8008",
+      "os": "Ubuntu 26.04",
+      "cpu": "Intel Core i9-12900KF",
+      "ram": "32GB",
+      "gpu": "AMD Radeon AI PRO R9700 32GB（gfx1201 / RDNA4）",
+      "sourceUrl": null,
+      "raw": {
+        "切替コマンド": "./gptoss.sh",
+        "サービス": "gptoss_20b_mxfp4",
+        "モデル": "GPT-OSS-20B（MoE 36B総/5.1B active）",
+        "量子化": "ネイティブMXFP4（openai公式）",
+        "エンジン": "vLLM-Radiance 1.0.397（RDNA4 MXFP4カーネル）",
+        "最大コンテキスト": "131,072",
+        "KVキャッシュ": "FP8 E4M3（必須）",
+        "APIポート": "8008",
+        "実行状況": "✅ 起動可（decode 58.99 T/s・prefill 3,083.26 T/s・受理率 28.4%／GPU KV 864,837 tok。2026-11-01 に 1.0.397 へ（同一イメージのため波及）check-services 3項目通過。2026-10-17 の 1.0.394 記録は decode 55.04 / prefill 2,832.74・117K NIAH PASS）"
+      },
+      "rank": 16
     },
     {
       "id": "atom1:qwen38flashnextexl3",
@@ -709,8 +797,8 @@
       "memory": 31.7,
       "memoryText": "31.7GB",
       "engine": "TabbyAPI + ExLlamaV3",
-      "engineVersion": "1.6.3",
-      "engineText": "TabbyAPI + ExLlamaV3 1.6.3",
+      "engineVersion": "1.6.5",
+      "engineText": "TabbyAPI + ExLlamaV3 1.6.5（2026-10-28 更新）",
       "speculative": "内蔵 MTP（8 tok・受入 54.2%）",
       "measuredAt": "2026-09-24",
       "note": "",
@@ -722,7 +810,7 @@
       "sourceUrl": null,
       "raw": {
         "ランチャー": "qwen38flashnextexl3",
-        "推論エンジン": "TabbyAPI + ExLlamaV3 1.6.3",
+        "推論エンジン": "TabbyAPI + ExLlamaV3 1.6.5（2026-10-28 更新）",
         "モデル": "Qwen3.8 Flash-Next 125B A6B（EXL3 2.05bpw h4/ng4）",
         "重み": "59GB（本体36.4 + ngram 26.2）",
         "コンテキスト / KV": "1,048,576 (YaRN) / Q8・ngram RAMロード",
@@ -732,95 +820,51 @@
         "prefill": "1,119.2 T/s",
         "Port": "8009"
       },
-      "rank": 15
-    },
-    {
-      "id": "atom2:gptoss",
-      "machineKey": "atom2",
-      "machine": "whitebearatom2",
-      "launcher": "gptoss",
-      "model": "GPT-OSS-20B（MoE 36B総/5.1B active）",
-      "modelId": "openai/gpt-oss-20b",
-      "weights": "ネイティブMXFP4（openai公式）",
-      "weightSize": null,
-      "decode": 55.04,
-      "decodeText": "—",
-      "prefill": 2832.74,
-      "prefillText": "—",
-      "context": 131072,
-      "contextText": "131,072",
-      "memoryKind": "VRAM",
-      "memoryNote": "ディスクリート GPU の実測 VRAM（32.6GB 中・sysfs サンプリング）",
-      "memory": null,
-      "memoryText": "—",
-      "engine": "vLLM-Radiance",
-      "engineVersion": "1.0.394",
-      "engineText": "vLLM-Radiance 1.0.394（RDNA4 MXFP4カーネル）",
-      "speculative": "—",
-      "measuredAt": "2026-10-17",
-      "note": "",
-      "port": "8008",
-      "os": "Ubuntu 26.04",
-      "cpu": "Intel Core i9-12900KF",
-      "ram": "32GB",
-      "gpu": "AMD Radeon AI PRO R9700 32GB（gfx1201 / RDNA4）",
-      "sourceUrl": null,
-      "raw": {
-        "切替コマンド": "./gptoss.sh",
-        "サービス": "gptoss_20b_mxfp4",
-        "モデル": "GPT-OSS-20B（MoE 36B総/5.1B active）",
-        "量子化": "ネイティブMXFP4（openai公式）",
-        "エンジン": "vLLM-Radiance 1.0.394（RDNA4 MXFP4カーネル）",
-        "最大コンテキスト": "131,072",
-        "KVキャッシュ": "FP8 E4M3（必須）",
-        "APIポート": "8008",
-        "実行状況": "✅ 起動可（decode 55.04 T/s・prefill 2,832.74 T/s。117K NIAH PASS（229.1s）。2026-10-17 に 1.0.394 へ更新して基準 54.8 T/s を維持）"
-      },
-      "rank": 16
-    },
-    {
-      "id": "atom2:qwen38radiance",
-      "machineKey": "atom2",
-      "machine": "whitebearatom2",
-      "launcher": "qwen38radiance",
-      "model": "Qwen 3.8 27B",
-      "modelId": "amd/Qwen3.8-27B-Quark-AWQ-MXFP4",
-      "weights": "Quark MXFP4（amd公式）",
-      "weightSize": null,
-      "decode": 52.99,
-      "decodeText": "—",
-      "prefill": 1619.78,
-      "prefillText": "—",
-      "context": 220160,
-      "contextText": "220,160（262,144 は KV 不足）",
-      "memoryKind": "VRAM",
-      "memoryNote": "ディスクリート GPU の実測 VRAM（32.6GB 中・sysfs サンプリング）",
-      "memory": null,
-      "memoryText": "—",
-      "engine": "vLLM-Radiance",
-      "engineVersion": "1.0.394",
-      "engineText": "vLLM-Radiance 1.0.394（vLLM 0.30.0・gfx1201専用カーネル）+ W4A8 / R4D GDN / MTP(3)",
-      "speculative": "FP8 E4M3（必須）",
-      "measuredAt": "2026-10-17",
-      "note": "",
-      "port": "8005",
-      "os": "Ubuntu 26.04",
-      "cpu": "Intel Core i9-12900KF",
-      "ram": "32GB",
-      "gpu": "AMD Radeon AI PRO R9700 32GB（gfx1201 / RDNA4）",
-      "sourceUrl": null,
-      "raw": {
-        "切替コマンド": "./qwen38radiance.sh",
-        "サービス": "qwen38_27b_mxfp4",
-        "モデル": "Qwen 3.8 27B",
-        "量子化": "Quark MXFP4（amd公式）",
-        "エンジン": "vLLM-Radiance 1.0.394（vLLM 0.30.0・gfx1201専用カーネル）+ W4A8 / R4D GDN / MTP(3)",
-        "最大コンテキスト": "220,160（262,144 は KV 不足）",
-        "KVキャッシュ": "FP8 E4M3（必須）",
-        "APIポート": "8005",
-        "実行状況": "✅ 起動可（decode 52.99 T/s・prefill 1,619.78 T/s。MTP 受理率 77.4%。60K NIAH PASS。2026-10-17 に 1.0.387→1.0.394 で decode 26.01→52.99 T/s へ向上）"
-      },
       "rank": 17
+    },
+    {
+      "id": "atom2:qwen38gguf",
+      "machineKey": "atom2",
+      "machine": "whitebearatom2",
+      "launcher": "qwen38gguf",
+      "model": "Qwen 3.8 27B",
+      "modelId": "unsloth/Qwen3.8-27B-GGUF",
+      "weights": "GGUF UD-Q4_K_XL（unsloth）+ mmproj-F16",
+      "weightSize": null,
+      "decode": 49.77,
+      "decodeText": "49.77 T/s",
+      "prefill": 924.21,
+      "prefillText": "924.21 T/s",
+      "context": 262144,
+      "contextText": "262,144",
+      "memoryKind": "VRAM",
+      "memoryNote": "ディスクリート GPU の実測 VRAM（32.6GB 中・sysfs サンプリング）",
+      "memory": 31.05,
+      "memoryText": "31.05GB（実測）",
+      "engine": "llama.cpp",
+      "engineVersion": "b12180",
+      "engineText": "llama.cpp b12180 Vulkan + MTP（自建 Mesa 26.0.8・ggml v0.29.0）",
+      "speculative": "q8_0（draft は q4_0）+ -cram 12288",
+      "measuredAt": "2026-11-01",
+      "note": "",
+      "port": "8007",
+      "os": "Ubuntu 26.04",
+      "cpu": "Intel Core i9-12900KF",
+      "ram": "32GB",
+      "gpu": "AMD Radeon AI PRO R9700 32GB（gfx1201 / RDNA4）",
+      "sourceUrl": null,
+      "raw": {
+        "切替コマンド": "./qwen38gguf.sh",
+        "サービス": "qwen38_27b_gguf",
+        "モデル": "Qwen 3.8 27B",
+        "量子化": "GGUF UD-Q4_K_XL（unsloth）+ mmproj-F16",
+        "エンジン": "llama.cpp b12180 Vulkan + MTP（自建 Mesa 26.0.8・ggml v0.29.0）",
+        "最大コンテキスト": "262,144",
+        "KVキャッシュ": "q8_0（draft は q4_0）+ -cram 12288",
+        "APIポート": "8007",
+        "実行状況": "✅ 起動可（decode 49.77 T/s・prefill 924.21 T/s。MTP 受理率 48.5%（mean_len 3.02）。250K NIAH PASS（742.0s）。2026-11-07 に b11700→b12180 を同一セッション対測で採用（control 47.75 / 895.23・受理率 45.3%・NIAH 記録 833.6s に対し 全項目改善）。250K ピーク VRAM 31,052MB（b11700 実測 31,366MB より 314MB 余裕））"
+      },
+      "rank": 18
     },
     {
       "id": "atom1:qwen38flashnextexl3_3p05",
@@ -842,8 +886,8 @@
       "memory": 41.2,
       "memoryText": "41.2GB",
       "engine": "TabbyAPI + ExLlamaV3",
-      "engineVersion": "1.6.3",
-      "engineText": "TabbyAPI + ExLlamaV3 1.6.3",
+      "engineVersion": "1.6.5",
+      "engineText": "TabbyAPI + ExLlamaV3 1.6.5（同上）",
       "speculative": "内蔵 MTP（8 tok・受入 58.9%）",
       "measuredAt": "2026-09-30",
       "note": "",
@@ -855,7 +899,7 @@
       "sourceUrl": null,
       "raw": {
         "ランチャー": "qwen38flashnextexl3_3p05",
-        "推論エンジン": "TabbyAPI + ExLlamaV3 1.6.3",
+        "推論エンジン": "TabbyAPI + ExLlamaV3 1.6.5（同上）",
         "モデル": "Qwen3.8 Flash-Next 125B A6B（EXL3 3.05bpw h5/ng5）",
         "重み": "80GB（本体52.3 + ngram 32.6）",
         "コンテキスト / KV": "1,048,576 (YaRN) / Q8・ngram ディスクストリーム",
@@ -864,50 +908,6 @@
         "decode": "48.85 T/s",
         "prefill": "1,025.2 T/s",
         "Port": "8011"
-      },
-      "rank": 18
-    },
-    {
-      "id": "atom2:qwen38gguf",
-      "machineKey": "atom2",
-      "machine": "whitebearatom2",
-      "launcher": "qwen38gguf",
-      "model": "Qwen 3.8 27B",
-      "modelId": "unsloth/Qwen3.8-27B-GGUF",
-      "weights": "GGUF UD-Q4_K_XL（unsloth）+ mmproj-F16",
-      "weightSize": null,
-      "decode": 45.93,
-      "decodeText": "—",
-      "prefill": 811.55,
-      "prefillText": "—",
-      "context": 262144,
-      "contextText": "262,144",
-      "memoryKind": "VRAM",
-      "memoryNote": "ディスクリート GPU の実測 VRAM（32.6GB 中・sysfs サンプリング）",
-      "memory": 31.37,
-      "memoryText": "31.37GB（実測）",
-      "engine": "llama.cpp",
-      "engineVersion": "b11700",
-      "engineText": "llama.cpp b11700 Vulkan + MTP（自建 Mesa 26.0.8）",
-      "speculative": "q8_0（draft は q4_0）+ -cram 12288",
-      "measuredAt": "2026-10-17",
-      "note": "",
-      "port": "8007",
-      "os": "Ubuntu 26.04",
-      "cpu": "Intel Core i9-12900KF",
-      "ram": "32GB",
-      "gpu": "AMD Radeon AI PRO R9700 32GB（gfx1201 / RDNA4）",
-      "sourceUrl": null,
-      "raw": {
-        "切替コマンド": "./qwen38gguf.sh",
-        "サービス": "qwen38_27b_gguf",
-        "モデル": "Qwen 3.8 27B",
-        "量子化": "GGUF UD-Q4_K_XL（unsloth）+ mmproj-F16",
-        "エンジン": "llama.cpp b11700 Vulkan + MTP（自建 Mesa 26.0.8）",
-        "最大コンテキスト": "262,144",
-        "KVキャッシュ": "q8_0（draft は q4_0）+ -cram 12288",
-        "APIポート": "8007",
-        "実行状況": "✅ 起動可（decode 45.93 T/s・prefill 811.55 T/s。MTP 受理率 45.6%。250K NIAH PASS（コールド 833.6s・再送 0.8s）。2026-10-17 に b11486→b11700、同一環境対測で速度・受理率とも完全一致＝退行なし。250K ピーク VRAM 31,366MB（+163MB））"
       },
       "rank": 19
     },
@@ -931,8 +931,8 @@
       "memory": 25.1,
       "memoryText": "25.1GB",
       "engine": "TabbyAPI + ExLlamaV3",
-      "engineVersion": "1.6.3",
-      "engineText": "TabbyAPI + ExLlamaV3 1.6.3",
+      "engineVersion": "1.6.5",
+      "engineText": "TabbyAPI + ExLlamaV3 1.6.5（2026-10-28 採用。下表の decode / prefill は 1.6.3 時点の実測）",
       "speculative": "内蔵 MTP（8 tok・受入 58.7%）",
       "measuredAt": "2026-09-24",
       "note": "",
@@ -944,7 +944,7 @@
       "sourceUrl": null,
       "raw": {
         "ランチャー": "qwen38flashnextexl3_4p05",
-        "推論エンジン": "TabbyAPI + ExLlamaV3 1.6.3",
+        "推論エンジン": "TabbyAPI + ExLlamaV3 1.6.5（2026-10-28 採用。下表の decode / prefill は 1.6.3 時点の実測）",
         "モデル": "Qwen3.8 Flash-Next 125B A6B（EXL3 4.05bpw h6/ng6）",
         "重み": "101GB（本体63.6 + vision 0.5 + ngram 36.4）",
         "コンテキスト / KV": "1,048,576 (YaRN) / Q8・ngram ディスクストリーム",
@@ -977,7 +977,7 @@
       "memoryText": "10.7GB",
       "engine": "vLLM",
       "engineVersion": "0.31.0",
-      "engineText": "vLLM 0.31.0（公式イメージ + tp1 patch + 上流 patch 19）",
+      "engineText": "vLLM 0.31.0（公式イメージ + tp1 patch + 上流 patch 19）。2026-10-28 に v0.32 系 :v0.32-tp1-sec2 を A/B → 不採用（KV −22%・NLL 悪化。現用は :v0.31-tp1-sec1）",
       "speculative": "内蔵 MTP（82% 受入）",
       "measuredAt": "2026-09-24",
       "note": "",
@@ -989,7 +989,7 @@
       "sourceUrl": null,
       "raw": {
         "ランチャー": "qwen38flashnext_nvfp4",
-        "推論エンジン": "vLLM 0.31.0（公式イメージ + tp1 patch + 上流 patch 19）",
+        "推論エンジン": "vLLM 0.31.0（公式イメージ + tp1 patch + 上流 patch 19）。2026-10-28 に v0.32 系 :v0.32-tp1-sec2 を A/B → 不採用（KV −22%・NLL 悪化。現用は :v0.31-tp1-sec1）",
         "モデル": "Qwen3.8 Flash-Next 125B A6B（NVFP4 + dense FP8 hybrid）",
         "重み": "71GB",
         "コンテキスト / KV": "262,144 / auto 約600K tok（gpu-mem-util 0.80）",
@@ -1002,6 +1002,95 @@
       "rank": 21
     },
     {
+      "id": "atom1:ornith122b",
+      "machineKey": "atom1",
+      "machine": "AI TOP ATOM",
+      "launcher": "ornith122b",
+      "model": "Ornith 1.5 122B",
+      "modelId": null,
+      "weights": "EXL3 4.049bpw・EAQ v1・qwen3_5_moe",
+      "weightSize": 61,
+      "decode": 39.23,
+      "decodeText": "39.23 T/s",
+      "prefill": 1254.7,
+      "prefillText": "1,254.7 T/s",
+      "context": 262144,
+      "contextText": "262,144（ネイティブ）/ Q8 3.0GiB",
+      "memoryKind": "統合メモリ",
+      "memoryNote": "起動後アイドル時の MemAvailable（ホスト 121.6GiB 中の空き）。値が大きいほど余裕がある＝消費が少ない",
+      "memory": 40.7,
+      "memoryText": "40.7GB",
+      "engine": "TabbyAPI + ExLlamaV3",
+      "engineVersion": "1.6.5",
+      "engineText": "TabbyAPI + ExLlamaV3 1.6.5（2026-10-28 追加・既存イメージ流用）",
+      "speculative": "内蔵 MTP（8 tok・受入 43.8%）",
+      "measuredAt": "2026-09-24",
+      "note": "",
+      "port": "8018",
+      "os": "Ubuntu 24.04",
+      "cpu": "NVIDIA GB10",
+      "ram": "128GB（CPU/GPU 共有）",
+      "gpu": "GB10（sm_121・ドライバ 580.178.04）",
+      "sourceUrl": null,
+      "raw": {
+        "ランチャー": "ornith122b",
+        "推論エンジン": "TabbyAPI + ExLlamaV3 1.6.5（2026-10-28 追加・既存イメージ流用）",
+        "モデル": "Ornith 1.5 122B（EXL3 4.049bpw・EAQ v1・qwen3_5_moe）",
+        "重み": "61GB（vision 16bit 0.9 + embeddings 16bit 1.5 を内包・ngram 無し）",
+        "コンテキスト / KV": "262,144（ネイティブ）/ Q8 3.0GiB",
+        "投機デコード": "内蔵 MTP（8 tok・受入 43.8%）",
+        "メモリ": "40.7GB",
+        "decode": "39.23 T/s",
+        "prefill": "1,254.7 T/s",
+        "Port": "8018"
+      },
+      "rank": 22
+    },
+    {
+      "id": "atom2:qwen38radiance",
+      "machineKey": "atom2",
+      "machine": "whitebearatom2",
+      "launcher": "qwen38radiance",
+      "model": "Qwen 3.8 27B",
+      "modelId": "amd/Qwen3.8-27B-Quark-AWQ-MXFP4",
+      "weights": "Quark MXFP4（amd公式）",
+      "weightSize": null,
+      "decode": 32.97,
+      "decodeText": "32.97 T/s",
+      "prefill": 1774.44,
+      "prefillText": "1,774.44 T/s",
+      "context": 220160,
+      "contextText": "220,160（262,144 は KV 不足）",
+      "memoryKind": "VRAM",
+      "memoryNote": "ディスクリート GPU の実測 VRAM（32.6GB 中・sysfs サンプリング）",
+      "memory": null,
+      "memoryText": "—",
+      "engine": "vLLM-Radiance",
+      "engineVersion": "1.0.397",
+      "engineText": "vLLM-Radiance 1.0.397（vLLM 0.30.0・gfx1201専用カーネル）+ W4A8 / R4D GDN / MTP(3)",
+      "speculative": "FP8 E4M3（必須）",
+      "measuredAt": "2026-11-01",
+      "note": "",
+      "port": "8005",
+      "os": "Ubuntu 26.04",
+      "cpu": "Intel Core i9-12900KF",
+      "ram": "32GB",
+      "gpu": "AMD Radeon AI PRO R9700 32GB（gfx1201 / RDNA4）",
+      "sourceUrl": null,
+      "raw": {
+        "切替コマンド": "./qwen38radiance.sh",
+        "サービス": "qwen38_27b_mxfp4",
+        "モデル": "Qwen 3.8 27B",
+        "量子化": "Quark MXFP4（amd公式）",
+        "エンジン": "vLLM-Radiance 1.0.397（vLLM 0.30.0・gfx1201専用カーネル）+ W4A8 / R4D GDN / MTP(3)",
+        "最大コンテキスト": "220,160（262,144 は KV 不足）",
+        "KVキャッシュ": "FP8 E4M3（必須）",
+        "APIポート": "8005",
+        "実行状況": "✅ 起動可（decode 32.97 T/s・prefill 1,774.44 T/s・受理率 53.7%／GPU KV 221,627 tok。2026-11-01 に 1.0.394→1.0.397 を同一セッション対測で採用（1.0.394 側は 32.98 / 1,769.97 / 47.1%＝退行なし。1.0.397 の価値は速度でなく pillow/aiohttp の advisory 解消と Qwen ツール grammar 修正）。2026-10-17 の 1.0.394 記録は decode 52.99 T/s・受理率 77.4%・60K NIAH PASS（環境状態が異なるため直接比較不可）"
+      },
+      "rank": 23
+    },
+    {
       "id": "atom2:magn",
       "machineKey": "atom2",
       "machine": "whitebearatom2",
@@ -1011,9 +1100,9 @@
       "weights": "GGUF UD-Q4_K_XL（20.5GB） + mmproj-BF16 0.93GB + 公式 DFlash2-Q8_0 2.06GB",
       "weightSize": null,
       "decode": 30.52,
-      "decodeText": "—",
+      "decodeText": "30.52/28.87 T/s",
       "prefill": 573.88,
-      "prefillText": "—",
+      "prefillText": "573.88/570.70 T/s",
       "context": 65536,
       "contextText": "64K（softCapMaxTokens 65536）",
       "memoryKind": "VRAM",
@@ -1021,10 +1110,10 @@
       "memory": 23.1,
       "memoryText": "23.1GB（実測）",
       "engine": "Magnitude",
-      "engineVersion": "0.2.9-59",
-      "engineText": "Magnitude 0.2.9-59 Vulkan（Mesa 26.0.8・gfx1201 coopmat。ROCm版は存在しない）",
+      "engineVersion": "0.2.16-66",
+      "engineText": "Magnitude 0.2.16-66 Vulkan（Mesa 26.0.8・gfx1201 coopmat。ROCm 版は存在しない。公式 magnitude-release.json の version 0.2.16 / acnRevision 66 / rpc.version 14 と一致＝最新。0.2.10 以降は自動更新で入り、右の性能値は 0.2.9 時点の実測＝未対測）",
       "speculative": "—",
-      "measuredAt": "2026-10-17",
+      "measuredAt": "2026-11-01",
       "note": "",
       "port": "10100",
       "os": "Ubuntu 26.04",
@@ -1037,13 +1126,13 @@
         "サービス": "magn（systemd user unit magn-headless）",
         "モデル": "Qwen 3.8 27B",
         "量子化": "GGUF UD-Q4_K_XL（20.5GB） + mmproj-BF16 0.93GB + 公式 DFlash2-Q8_0 2.06GB",
-        "エンジン": "Magnitude 0.2.9-59 Vulkan（Mesa 26.0.8・gfx1201 coopmat。ROCm版は存在しない）",
+        "エンジン": "Magnitude 0.2.16-66 Vulkan（Mesa 26.0.8・gfx1201 coopmat。ROCm 版は存在しない。公式 magnitude-release.json の version 0.2.16 / acnRevision 66 / rpc.version 14 と一致＝最新。0.2.10 以降は自動更新で入り、右の性能値は 0.2.9 時点の実測＝未対測）",
         "最大コンテキスト": "64K（softCapMaxTokens 65536）",
         "KVキャッシュ": "engine 内蔵（DFlash2）",
         "APIポート": "10100",
         "実行状況": "✅ 起動可（decode 30.52/28.87 T/s・prefill 573.88/570.70 T/s。実 VRAM 23.1GB・空き 9.5GB。60K NIAH PASS。2026-10-17 に 0.2.7→0.2.9 で速度 -3〜-6% と引き換えに VRAM -1.3GB。Vision は不可）"
       },
-      "rank": 22
+      "rank": 24
     },
     {
       "id": "atom1:qwen38sglangdspark",
@@ -1088,7 +1177,7 @@
         "prefill": "2,083.6 T/s",
         "Port": "8008"
       },
-      "rank": 23
+      "rank": 25
     },
     {
       "id": "atom1:qwen38sglangdflash",
@@ -1133,7 +1222,7 @@
         "prefill": "1,800.4 T/s",
         "Port": "8008"
       },
-      "rank": 24
+      "rank": 26
     },
     {
       "id": "atom1:Muse",
@@ -1178,7 +1267,7 @@
         "prefill": "799.2 T/s",
         "Port": "8004"
       },
-      "rank": 25
+      "rank": 27
     },
     {
       "id": "atom1:qwen38sglangeagle",
@@ -1223,7 +1312,7 @@
         "prefill": "2,245.7 T/s",
         "Port": "8008"
       },
-      "rank": 26
+      "rank": 28
     },
     {
       "id": "atom1:qwen38nvfp4",
@@ -1268,7 +1357,7 @@
         "prefill": "1,508.6 T/s",
         "Port": "8007"
       },
-      "rank": 27
+      "rank": 29
     },
     {
       "id": "atom1:qwen38",
@@ -1313,7 +1402,52 @@
         "prefill": "776.4 T/s†",
         "Port": "8005"
       },
-      "rank": 28
+      "rank": 30
+    },
+    {
+      "id": "wb2026:strataD4",
+      "machineKey": "wb2026",
+      "machine": "Whitebear2026",
+      "launcher": "strataD4",
+      "model": "ISTA-DASLab DeepSeek-V4.1-Flash-1017 IQ1_M 1.75bpw",
+      "modelId": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017",
+      "weights": "40層・384 experts MoE + Engram n-gram 111GB + DSpark drafter 8GB・2026-10-27 追加",
+      "weightSize": 224,
+      "decode": 15.4,
+      "decodeText": "8.5〜10.4 T/s（2026-10-27・0.1.51 短回答実測）→ 12.4〜15.4 T/s（2026-10-28・0.1.52 A/B）",
+      "prefill": 550.2,
+      "prefillText": "17.1 T/s（23 tok・0.1.51）→ cold 7,213 tok で 85.4 → 550.2 T/s（TTFT 84.4 → 13.1 s）（0.1.52）",
+      "context": 8192,
+      "contextText": "8,192（検証済みサイズ。公式に KV streaming 該当なし）",
+      "memoryKind": "VRAM",
+      "memoryNote": "アイドル時の VRAM 実測（32GB 中）。Strata 系は RAM に Expert を page-lock する",
+      "memory": 28,
+      "memoryText": "experts 3,826 件（約 28GB 相当）を VRAM",
+      "engine": "Strata",
+      "engineVersion": "0.1.52",
+      "engineText": "Strata サーバー + 専用エンジン strata-dsv41 0.1.52（署名済みフィード / CUDA 13・2026-10-28 に v0.2.7 で更新。A/B 用に 0.1.51 も engine-dsv41/ へ残置）",
+      "speculative": "DSpark（auto・--dspark-conf 0.65）",
+      "measuredAt": "2026-10-30",
+      "note": "",
+      "port": "8080",
+      "os": "WSL2 Ubuntu 26.04（Windows ホスト）",
+      "cpu": "Intel Core Ultra 7 270K Plus",
+      "ram": "86GB（WSL 割当）",
+      "gpu": "NVIDIA RTX 5090 32GB（sm_120・CUDA 13.1 / ドライバ 615.71）",
+      "sourceUrl": null,
+      "raw": {
+        "ランチャー": "strataD4",
+        "推論エンジン": "Strata サーバー + 専用エンジン strata-dsv41 0.1.52（署名済みフィード / CUDA 13・2026-10-28 に v0.2.7 で更新。A/B 用に 0.1.51 も engine-dsv41/ へ残置）",
+        "モデル": "ISTA-DASLab DeepSeek-V4.1-Flash-1017 IQ1_M 1.75bpw（40層・384 experts MoE + Engram n-gram 111GB + DSpark drafter 8GB・2026-10-27 追加）",
+        "重み": "224GB（IQ1_M シャード 121 + Engram 111 + drafter 8。2026-10-27 に削除＝速度が実用に耐えず採用見送り）",
+        "コンテキスト / KV": "8,192（検証済みサイズ。公式に KV streaming 該当なし）",
+        "投機デコード": "DSpark（auto・--dspark-conf 0.65）",
+        "メモリ": "experts 3,826 件（約 28GB 相当）を VRAM",
+        "decode": "8.5〜10.4 T/s（2026-10-27・0.1.51 短回答実測）→ 12.4〜15.4 T/s（2026-10-28・0.1.52 A/B）",
+        "prefill": "17.1 T/s（23 tok・0.1.51）→ cold 7,213 tok で 85.4 → 550.2 T/s（TTFT 84.4 → 13.1 s）（0.1.52）",
+        "Port": "8080"
+      },
+      "rank": 31
     },
     {
       "id": "atom1:qwen38swift_dflash",
@@ -1358,7 +1492,7 @@
         "prefill": "1,254.4 T/s",
         "Port": "8012"
       },
-      "rank": 29
+      "rank": 32
     },
     {
       "id": "atom1:mimo9b",
@@ -1403,7 +1537,7 @@
         "prefill": "3,806.6 T/s†",
         "Port": "8014"
       },
-      "rank": 30
+      "rank": 33
     },
     {
       "id": "atom1:qwen38bf16",
@@ -1448,7 +1582,7 @@
         "prefill": "1,316.4 T/s†",
         "Port": "8006"
       },
-      "rank": 31
+      "rank": 34
     },
     {
       "id": "atom1:qwen38sglang",
@@ -1493,7 +1627,7 @@
         "prefill": "2,364.5 T/s",
         "Port": "8008"
       },
-      "rank": 32
+      "rank": 35
     },
     {
       "id": "atom1:qwen38swift",
@@ -1538,7 +1672,7 @@
         "prefill": "1,278.6 T/s†",
         "Port": "8012"
       },
-      "rank": 33
+      "rank": 36
     },
     {
       "id": "atom1:glm53flash_mosaic",
@@ -1583,7 +1717,7 @@
         "prefill": "292.4 T/s",
         "Port": "8017"
       },
-      "rank": 34
+      "rank": 37
     },
     {
       "id": "wb2026:swiftqwen38",
@@ -1628,7 +1762,7 @@
         "prefill": "252K を ~154 秒（~1,650 T/s）",
         "Port": "8040"
       },
-      "rank": 35
+      "rank": 38
     },
     {
       "id": "atom2:qwen38sglangrocm",
@@ -1653,7 +1787,7 @@
       "engineVersion": "0.5.15",
       "engineText": "SGLang 0.5.15 ROCm（rocm/sgl-dev・AITER+triton）",
       "speculative": "—",
-      "measuredAt": "2026-10-17",
+      "measuredAt": "2026-11-01",
       "note": "",
       "port": "8006",
       "os": "Ubuntu 26.04",
@@ -1672,7 +1806,7 @@
         "APIポート": "8006",
         "実行状況": "❌ ロード失敗（起動不可）。AWQ は gptq_marlin_repack が ROCm ビルドに無し。MXFP4 は AITER の is_fp4_avail() が gfx950/gfx1250 限定で gfx1201 は MXFP4 is not available on your device。2026-10-06 に再現確認"
       },
-      "rank": 36
+      "rank": 39
     },
     {
       "id": "wb2026:qwen9",
@@ -1717,7 +1851,7 @@
         "prefill": "—",
         "Port": "5003"
       },
-      "rank": 37
+      "rank": 40
     },
     {
       "id": "wb2026:exl",
@@ -1762,7 +1896,7 @@
         "prefill": "—",
         "Port": "8888"
       },
-      "rank": 38
+      "rank": 41
     }
   ]
 }

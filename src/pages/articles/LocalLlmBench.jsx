@@ -14,6 +14,12 @@ export default function LocalLlmBench() {
         いままで測定してきた、自社内のローカル環境で動作させているローカルLLMモデルの性能を一覧で表示します。
         単位 T/s はトークン毎秒（decode = 生成速度、prefill = 入力読み込み速度）です。
       </p>
+      <p className="lead">
+        みどころは、今回の更新（2026-11-07）で whitebearatom2 に新エンジン hipfire（Rust + HIP ネイティブ）が加わり、
+        Qwen 3.8 27B で decode 147 / prefill 4,267 T/s を記録して本機最速（全体 3 位）になったこと。
+        同機の Strata 0.2.11 は expert の SSD ストリーミングによる prefill 律速を解消して 1,372 T/s（+723%）に跳ね上がり、
+        新規の Ornith 1.5 122B（AI TOP ATOM）と DeepSeek-V4.1-Flash（Whitebear2026）を加えた 41 件が掲載されています。
+      </p>
 
       {bench && (
         <div className="article-meta reveal">

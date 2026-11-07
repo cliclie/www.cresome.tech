@@ -115,7 +115,7 @@ publish ブランチには以下のファイルのみ存在します:
 
 - メニューは「トップ」〜「会社概要」より間隔を広げ、直下に記事の最新更新日を表示します（`Sidebar.jsx` / `Drawer.jsx` 共通、`.nav-group--spaced` と `.nav-sub`）
 - 記事の追加は、本文を `src/pages/articles/` に置いて `src/data/articles/index.js` の `ARTICLES` に登録するだけ（メニュー側の変更不要）
-- **記事1「ローカル環境でローカルLLMをローカルな条件でベンチマーク」**: 自社内 3 台（AI TOP ATOM / whitebearatom2 / Whitebear2026）の環境設定リポジトリの README から `npm run bench:fetch`（`scripts/fetch-llm-bench.mjs`）が生成した 38 環境の一覧。15 列（順位・モデル名・重み名・decode・prefill・コンテキスト長・使用メモリ・機種名・OS・CPU・搭載RAM・推論エンジン・エンジン版・計測日・備考）を全列ソートでき、ヘッダー行と先頭 2 列は固定、行クリックで詳細諸元をポップアップします。一覧はブラウザ幅に追従し、社内 IP は公開バンドルに含めません
+- **記事1「ローカル環境でローカルLLMをローカルな条件でベンチマーク」**: 自社内 3 台（AI TOP ATOM / whitebearatom2 / Whitebear2026）の環境設定リポジトリの README から `npm run bench:fetch`（`scripts/fetch-llm-bench.mjs`）が生成した 41 環境の一覧。15 列（順位・モデル名・重み名・decode・prefill・コンテキスト長・使用メモリ・機種名・OS・CPU・搭載RAM・推論エンジン・エンジン版・計測日・備考）を全列ソートでき、ヘッダー行と先頭 2 列は固定、行クリックで詳細諸元をポップアップします。一覧はブラウザ幅に追従し、社内 IP は公開バンドルに含めません
 
 ## 背景エフェクト
 
@@ -338,3 +338,10 @@ three.js で読み込める GLB レイヤー群と最短経路を生成します
 - **ドキュメント整備**: `map/README.md` に「**依存パッケージと脆弱性監査（2026-11-04）**」節（宣言 / 実環境 / advisory の対応表、CityGML パースの XXE 対策、監査実行手順）と 2026-11-04 再ビルド実測の追記、`MAP.md`「データパイプライン（map/）」に生成環境（Python 3.10+・XXE 抑止）の注記を追加
 - **公開（実施済み 2026-11-04）**: `main` へ2コミットを push（`c05f252..0a44b1f` = `2e329ea` chore(deps) → `0a44b1f` docs(clinerules)）。`npm run deploy` は vite 8.3.5 でビルド成功（297 ms、JS 906.50 kB・gzip 246.62 kB / llm-bench 56.66 kB・gzip 10.49 kB / CSS 26.17 kB・gzip 6.20 kB）したが、**生成物が 2026-10-26 の `publish 1694f2d` と完全一致**したため `deploy.mjs` が commit/push をスキップ（`map/` の Python 側のみで dist に影響なし。`publish` は `1694f2d` のままが正しい）
   - https://www.cresome.tech/ が `./assets/index-BFpJY82V.js` と `./assets/index-DJdGyglj.css` を参照し、`index-BFpJY82V.js` 906,507 B / `index-DJdGyglj.css` 26,171 B / `llm-bench-0lNqhiJq.js` 56,667 B（38 環境）の3点がいずれも 200 を返すことを実測確認
+
+### 2026-11-07: ローカルLLMベンチマークのデータ更新（38 → 41 環境）と atom2 詳細ポップアップ修正
+
+- **契機**: 3 環境設定リポジトリの README が更新（`Atom2LLM` に新エンジン `hipfire`（Rust + HIP ネイティブ）追加と5行の再計測、`DGXSparkLLMEnv` に `Ornith 1.5 122B` 追加、`Whitebear2026-WSL2` に `DeepSeek-V4.1-Flash` 追加）のため `npm run bench:fetch` を再実行して記事データを再生成（3ソースとも疎通: Gitea 2 台は匿名 HTTP、GitHub は SSH clone）
+- **変更**: `llm-bench.json` が 38 → 41 行（atom1: 18→19 / atom2: 6→7 / wb2026: 14→15）。新規行: `atom2:qwen38hipfire`（hipfire 0.4.5・decode 147.06 / prefill 4,266.54 T/s → 3 位）、`atom1:ornith122b`（39.23 / 1,254.7 T/s → 22 位）、`wb2026:strataD4`（15.4 / 550.2 T/s → 31 位）。`atom2:strata` は Strata 0.2.3→0.2.11 で再計測（decode 60.47→75.92、prefill 191.38→1,372.14 = +723%・順位 13→10）。atom2 表ヘッダー「2026-10-17 時点」→「2026-11-01 時点」のため strata の手動 measuredAt 補正は不要に。MODEL_IDS 2件追加（`hipfire-models/qwen3.8-27b` / `ISTA-DASLab/DeepSeek-V4.1-Flash-1017`）、記事日を 2026-11-07 に更新、記事 lead の次に「みどころは～」ハイライト段落を追加、本 README の記事説明を「41 環境」に更新
+- **バグ修正**: atom2 行の詳細ポップアップで decode / prefill が「—」表示（`gptoss` の prefill は旧値 2,832.74 表示）になる初出時から存在した長期間バグ。原因: `pick` 正規表現のキャプチャクラス `[\d.,〜~\-\s/T]` に `s` 文字が含まれていなかった（`\s` は空白エスケープ）ため "T/s" は "T/" で途切れて terminator（`・`）に到達せず、terminator に `（` が無いため値の直後が「（DFlash auto」の場合は常に失敗。キャプチャクラスに `s`、terminator に `（` / `(` を追加
+- **検証**: `npm run build` 成功（JS 920.45 kB・gzip 251.08 kB / llm-bench 65.79 kB・gzip 13.12 kB / CSS 26.17 kB・gzip 6.20 kB）。JSON 全 41 行の decode / prefill テキスト突合（欠落 0 件）、dist に `192.168` が 0 件、puppeteer（`vite preview`・1440px）で全 41 行を逐一行クリックしポップアップの decode / prefill を JSON と突合 → ALL PASS

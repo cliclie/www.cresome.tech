@@ -75,7 +75,7 @@ npm run bench:fetch
   - 同じ名前の再計測が複数書かれると**後勝ち**（`strataQ3` = 2026-10-25）
   - whitebearatom2 は「測定日」注記が無いため、表ヘッダー「実行状況（2026-10-17 時点）」を `headerDate` で全行に適用
 - `note`（備考）は自動生成しません（既定は空欄）。
-- **手動追記は再生成でも消えません**: `fetch-llm-bench.mjs` が既存 JSON を読み、`note` は常時、`measuredAt` は自動抽出できなかった行について既存値を維持します。`Whitebear2026` の `strata15` / `strataS4` / `strataU4` / `llmjp` / `qwen9` / `exl` の計測日は、README に個別記載が無いため JSON を直接編集して補ってください。`whitebearatom2` の `strata`（2026-10-26 追加）は表ヘッダーの日付（2026-10-17）が更新されないため、README 本文の 2026-10-26 を JSON で直接補正しています（`bench:fetch` 再生成すると 2026-10-17 に戻るため、実行後に再補正してください）。
+- **手動追記は再生成でも消えません**: `fetch-llm-bench.mjs` が既存 JSON を読み、`note` は常時、`measuredAt` は自動抽出できなかった行について既存値を維持します。`Whitebear2026` の `strata15` / `strataS4` / `strataU4` / `llmjp` / `qwen9` / `exl` の計測日は、README に個別記載が無いため JSON を直接編集して補ってください。`whitebearatom2` の `strata`（2026-10-26 追加）は表ヘッダーの日付が更新されないため、JSON で直接補正していましたが、2026-11-07 にヘッダーが 2026-11-01 へ更新されたため自動抽出されるようになり手動補正は不要になりました。
 
 ## 既知の制限
 
@@ -103,3 +103,20 @@ npm run bench:fetch
 - `npm run bench:fetch` を再実行して再生成: 37 → 38 行（atom2: 5 → 6 行）。新行は `strata`（Qwen3.8-Flash-Next IQ3_XXS / Strata 0.2.3・decode 60.47 / prefill 191.38 T/s・順位 13）
 - 表ヘッダー「2026-10-17 時点」が strata 追加後に更新されていないため、strata の計測日は JSON で直接 2026-10-26 に補正（上記「計測日と備考の運用」参照）
 - 記事日を 2026-10-26 に更新。`npm run build` 成功、dist に `192.168` が 0 件
+
+### 2026-11-07 データ更新（38 → 41 行）
+- `npm run bench:fetch` 再実行: atom1 18→19 / atom2 6→7 / wb2026 14→15（計 41 行）
+- 新規行: `atom2:qwen38hipfire`（hipfire 0.4.5・Rust+HIP ネイティブ、decode 147.06 / prefill 4,266.54 T/s → 3 位）、`atom1:ornith122b`（Ornith 1.5 122B / ExLlamaV3 1.6.5、39.23 / 1,254.7 T/s → 22 位）、`wb2026:strataD4`（DeepSeek-V4.1-Flash IQ1_M / Strata 0.1.52、15.4 / 550.2 T/s → 31 位）
+- `atom2:strata` 再計測（Strata 0.2.3→0.2.11）: decode 60.47→75.92、prefill 191.38→1,372.14（+723%。DFlash2 既定 drafter 化＋Radeon prompt 改善で expert の SSD ストリーム律速が解消）。順位 13→10
+- atom2 表ヘッダー「2026-10-17 時点」→「2026-11-01 時点」のため全行の計測日が 2026-11-01 に（strata の手動補正は解消）
+- 性能値変更の再計測: `atom2:qwen38gguf`（llama.cpp b11700→b12180、decode 45.93→49.77 / prefill 811.55→924.21）、`atom2:gptoss`（vLLM-Radiance 1.0.394→1.0.397、55.04→58.99 / 2,832.74→3,083.26）、`atom2:qwen38radiance`（1.0.397、decode 52.99→32.97 / prefill 1,619.78→1,774.44。README 明記の通り環境状態違いで直接比較不可）
+- 性能値不変のバージョン更新のみ: atom2 `magn`（0.2.16-66）、atom1 `qwen38flashnextexl3`×3（ExLlamaV3 1.6.5）、wb2026 `swift40` / `swift35` / `tabby`（1.6.6）、`strataQ3`（計測日 2026-10-30）
+- MODEL_IDS 追加: `atom2:qwen38hipfire` = `hipfire-models/qwen3.8-27b`（README 記載の HF パス）、`wb2026:strataD4` = `ISTA-DASLab/DeepSeek-V4.1-Flash-1017`。`atom1:ornith122b` は README に提供者名が無いため null 維持
+- 記事 lead の次に「みどころは～」ハイライト段落を追加。記事日を 2026-11-07 に更新
+- `npm run build` 成功、dist に `192.168` が 0 件。puppeteer（`vite preview`・1440px）: `nav-sub = 2026-11-07`、lead 2 段落、表 41 行、「41 環境（データ生成日 2026-11-07）」
+
+### 2026-11-07 修正（atom2 行の詳細ポップアップで decode / prefill が「—」になるバグ）
+- 症状: atom2 6 行すべてで詳細ポップアップの decode / prefill が「—」表示、`gptoss` の prefill は旧値（2,832.74）表示。初出時から存在した長期間バグ（旧 JSON でも `magn` 等は「—」だった）
+- 原因: `buildAtom2Rows` の `pick` 正規表現のキャプチャクラス `[\d.,〜~\-\s/T]` に `s` 文字が含まれていなかった（`\s` は空白エスケープ）。"T/s" は "T/" で途切れて terminator（`・`）に到達せずマッチ失敗。terminator に `（` が無いため、値の直後が「（DFlash auto」（hipfire / strata）の場合は常に失敗。`gptoss` の prefill は 2 箇所目の「prefill」（旧値記録）だけマッチしていた
+- 修正: キャプチャクラスに `s` を追加、terminator に `（` / `(` を追加（`scripts/fetch-llm-bench.mjs`）。`npm run bench:fetch` 再生成 + `npm run build`
+- 検証: puppeteer で**全 41 行**を逐一行クリックし、ポップアップの decode / prefill を JSON と突合 → ALL PASS（hipfire = 147.06 / 4,266.54 T/s 等）

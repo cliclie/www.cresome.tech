@@ -114,6 +114,7 @@ const MODEL_IDS = {
   'atom2:qwen38gguf': 'unsloth/Qwen3.8-27B-GGUF',
   'atom2:gptoss': 'openai/gpt-oss-20b',
   'atom2:magn': 'unsloth/Qwen3.8-27B-GGUF',
+  'atom2:qwen38hipfire': 'hipfire-models/qwen3.8-27b',
   // ---- Whitebear2026（Whitebear2026-WSL2） ----
   'wb2026:swift40': 'erlidev/Swift-Qwen3.8-27B-EXL3',
   'wb2026:swift35': 'erlidev/Swift-Qwen3.8-27B-EXL3',
@@ -127,6 +128,7 @@ const MODEL_IDS = {
   'wb2026:strataU4': 'unsloth/Qwen3.8-Flash-Next-GGUF',
   'wb2026:strataQ3': 'ukisai/Swift-1.5-Qwen3.8-Flash-Next-GSQ-RCO-GGUF',
   'wb2026:strataC1': 'ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF',
+  'wb2026:strataD4': 'ISTA-DASLab/DeepSeek-V4.1-Flash-1017',
 };
 
 // 推論エンジン名の候補（複合表記は parseEngine で寄せる）
@@ -647,8 +649,10 @@ function buildAtom2Rows(machine, table) {
     status: colIndex(h, ['実行状況']),
   };
   const cell = (row, key) => (i[key] >= 0 ? row[i[key]] ?? '' : '');
+  // キャプチャに s を含める（「T/s」を最後まで拾うため。「\s」は空白エスケープで s 文字ではない）。
+  // terminator は ・ / 。 / （ / ( のみ（README の「decode X T/s・」「prefill Y T/s（」表記に対応）。
   const pick = (text, label) =>
-    (stripMd(text).match(new RegExp(label + '\\s*([\\d.,〜~\\-\\s/T]+?)(?:・|。|$)', 'i')) || ['', '—'])[1].trim() || '—';
+    (stripMd(text).match(new RegExp(label + '\\s*([\\d.,〜~\\-\\s/Ts]+?)(?:・|。|（|\\(|$)', 'i')) || ['', '—'])[1].trim() || '—';
 
   const rows = [];
   for (const raw of table.rows) {
