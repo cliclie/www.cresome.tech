@@ -2,6 +2,10 @@
 
 Clineで作業を行うときの所作
 
+> **★最重要**: `run_commands` が `✖ Invalid input` を返したら、**チャットを作り直す前に**
+> 「★★ run_commands が `✖ Invalid input` になったら」節（argv 形式 `{"command":..,"args":[..]}` への切替）
+> を試すこと。2026-11-07 にセッション再開なしで復旧済み。旧来記載の「セッション再開が唯一の確実な復旧」は誤り。
+
 ## コマンドは30秒でエラーになる
 
 -- 長いコマンドを実行するとき、sleepで遅延させるがsleepの時間は30秒未満にすること。
@@ -36,27 +40,48 @@ Clineで作業を行うときの所作
    （欠くと `✖ Invalid input: expected array, received undefined → at requests` のように
    zod がフィールドパス付きで弾く）。
 -- 同じコマンドが成功したり失敗したり混在する場合は、書き方の問題ではなく次項のセッション破損が原因。
+   **ただし次項のとおり、argv 形式への切り替えで復旧できることが多い**（セッション再開は最後）。
 
-## run_commands が壊れたらセッション再開が唯一の確実な復旧
+## ★★ run_commands が `✖ Invalid input` になったら: セッション再開前に argv 形式へ切り替える
 
--- 症状: `ls` や `echo ok` のような自明なコマンドを含めて **run_commands の全呼び出しが
-   `✖ Invalid input` を返す**のに、`editor` / `read_files` / `search_codebase` /
-   `fetch_web_content` はそのまま正常に動く。
--- 原因は上流バグ。cline/cline#10506（セッション／ハブ切断後に全ツールが `✖ Invalid input` になる）と
-   一致し、**not_planned でクローズ済み**＝自動復旧も修正パッチも期待できない。
-   ※上の「6回同じコマンドを実行するとエラーになる」も、実際はこの破損の初期症状だった可能性が高い。
--- 対処: **新しいチャットで会話をやり直す**（セッションを作り直す）のが最短。
-   リトライ・コマンド短縮・別ツールを挟む、では復旧しなかった。
--- 予防: `Start-Process` 等で起こした dev サーバー / preview / puppeteer(Chrome) を残したまま
-   長時間作業しない。検証したら必ず kill してプロセスを積まないこと。
--- 状態変更（コミット・プッシュ・デプロイ）の途中で壊れたら、実行すべきコマンドをそのまま利用者に
-   提示して代行してもらう。推測で「完了した」と報告しない。
+**2026-11-07 の実測で、セッションを作り直さずに復旧した。** 従来の「セッション再開が唯一の確実な復旧」は
+**誤り**なので、以下の優先順位で対処すること。
 
-## search_codebase は sociax/ 配下を検索しない
+### 症状（2026-11-07 実例）
+- `commands` 配列形式の呼び出しが、`echo ok` のような自明コマンドを含め **全滅**して `✖ Invalid input` を返す
+- 同一セッション内で `echo ok` は通り、次の呼び出しは失敗する、という**間欠**パターンもある
+- `editor` / `read_files` / `search_codebase` / `fetch_web_content` は終始正常に動く
+  （＝ツール基盤の破損ではなく、`run_commands` の引数ゲートだけが壊れる）
 
--- ワークスペースルートの .gitignore が /sociax/ を除外しているため、search_codebase の索引対象はワークスペース直下の追跡ファイル(約150件)のみで、sociax/front・back・time-tracking のソース(約4,000ファイル)は対象外。
--- sociax/ 関連の検索で "No results found (Searched 127 files)" 等が返っても「文字列が存在しない」ではない。sociax/ のコード検索は grep(run_commands) / CodeGraph(シンボル・正規表現) / SociaX RAG(意味検索)を使うこと。
--- 補足: CodeGraph の検索はシンボル単位のため、Vue テンプレ内の文字列・Mapper XML・.properties・.sql はヒットしない。行単位・全ファイル型の正確一致が必要なら grep にフォールバックする。
+### 復旧手順（上から順に試す。実測で 1 → 2 → 3 の順で成功した）
+1. **`commands` 配列をやめ、トップレベル argv 形式に切り替える**（これが本命）
+   - 効く例: `{"command":"echo","args":["probe"]}` → 成功
+   - 壊れた `commands` 形式と同じ内容でも、`command` / `args` の分離なら通った
+   - 実例: `{"command":"bash","args":["-lc","cd /home/x && git status --short"]}` → 成功
+2. **args を「純粋な分割」にする**（1 要素に長いコマンド文字列を詰めない）
+   - 強い: `{"command":"timeout","args":["24","bash","/tmp/run_bench.sh"]}` → 成功
+   - 弱い: `{"command":"bash","args":["-lc","python3 bench.py --base http://... --key XXX --parallel 4"]}`
+     → **同じ形でも失敗した**。`--base` / `--key` のような**長いフラグ連なりを 1 要素に詰めると弾かれやすい**
+3. **コマンド本体をスクリプトファイルへ逃がす**（`editor` は生きているのでそれで書く）
+   - `editor` で `/tmp/run_x.sh` を作り、`run_commands` からは `["24","bash","/tmp/run_x.sh"]` だけ呼ぶ
+   - 引数が多い処理（bench・curl POST・git 複合）はこれで安定した
+4. **それでも全滅なら** 新しいチャットでセッションを作り直す（従来どおりの最終手段）
+
+### 書き方の補足（前回から変更なし）
+- `commands` は**文字列の配列**のみ。要素をオブジェクトにするとキー名問わず呼び出し全体が死ぬ
+- 同一コマンドの連発も避けると無難（`--` を含む長い単一文字列が最も弾かれやすい）
+- 裏起動は `setsid nohup <cmd> > /tmp/x.log 2>&1 < /dev/null & echo PID=$!` を
+  `{"command":"bash","args":["-lc","..."]}` の中に入れて即返す（30 秒ルールは維持）
+
+### 状態変更（コミット・プッシュ・デプロイ）の途中で壊れたら
+- 上記 1-3 で実行を継続できるのが最短。**復旧を諦めて利用者に代行を頼むのは 4 の後**
+- いずれにせよ推測で「完了した」と報告しない。実行できた範囲と残りを切り分けて提示する
+
+### 予防（変更なし）
+- `Start-Process` 等で起こした dev サーバー / preview / puppeteer(Chrome) を残したまま長時間作業しない。
+  検証したら必ず kill してプロセスを積まないこと
+- 上流バグ cline/cline#10506 は依然 not_planned でクローズ済み＝修正パッチは期待できない。
+  **回避策（argv 形式）を標準手段として覚える**のが現実的な解
 
 # LLM Thinking & Output Constraints
 - **Do not output loose markdown formatting inside `<thinking>` tags.** Never use triple backticks (```) or unclosed symbols inside the thinking block, as it may break the parser or cause a token timeout.
