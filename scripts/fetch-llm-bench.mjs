@@ -115,6 +115,7 @@ const MODEL_IDS = {
   'atom2:gptoss': 'openai/gpt-oss-20b',
   'atom2:magn': 'unsloth/Qwen3.8-27B-GGUF',
   'atom2:qwen38hipfire': 'hipfire-models/qwen3.8-27b',
+  'atom2:qwen3vl': 'Qwen/Qwen3-VL-8B-Instruct-FP8',
   // ---- Whitebear2026（Whitebear2026-WSL2） ----
   'wb2026:swift40': 'erlidev/Swift-Qwen3.8-27B-EXL3',
   'wb2026:swift35': 'erlidev/Swift-Qwen3.8-27B-EXL3',

@@ -76,6 +76,7 @@ npm run bench:fetch
   - whitebearatom2 は「測定日」注記が無いため、表ヘッダー「実行状況（2026-10-17 時点）」を `headerDate` で全行に適用
 - `note`（備考）は自動生成しません（既定は空欄）。
 - **手動追記は再生成でも消えません**: `fetch-llm-bench.mjs` が既存 JSON を読み、`note` は常時、`measuredAt` は自動抽出できなかった行について既存値を維持します。`Whitebear2026` の `strata15` / `strataS4` / `strataU4` / `llmjp` / `qwen9` / `exl` の計測日は、README に個別記載が無いため JSON を直接編集して補ってください。`whitebearatom2` の `strata`（2026-10-26 追加）は表ヘッダーの日付が更新されないため、JSON で直接補正していましたが、2026-11-07 にヘッダーが 2026-11-01 へ更新されたため自動抽出されるようになり手動補正は不要になりました。
+- **全環境注記の展開で古い日付が塗られる行に注意**（2026-11-14 確認）: AI TOP ATOM の「測定日: 2026-09-24（全環境一括）」注記は、注記より後に追加された行（Ripple / Nanbeige / SC 量子化 / 11-10 再計測で更新された行）にも 2026-09-24 を展開して塗ります。README の「2026-11-10 再計測」節と各所の「2026-11-01 / 11-09 実測」記載に合わせて、再生成後に JSON 側で上書き補正する（抽出側が「成功」と判定するため既存値維持ロジックが効かない）。対象は検証履歴の 2026-11-14 項参照。
 
 ## 既知の制限
 
@@ -120,3 +121,14 @@ npm run bench:fetch
 - 原因: `buildAtom2Rows` の `pick` 正規表現のキャプチャクラス `[\d.,〜~\-\s/T]` に `s` 文字が含まれていなかった（`\s` は空白エスケープ）。"T/s" は "T/" で途切れて terminator（`・`）に到達せずマッチ失敗。terminator に `（` が無いため、値の直後が「（DFlash auto」（hipfire / strata）の場合は常に失敗。`gptoss` の prefill は 2 箇所目の「prefill」（旧値記録）だけマッチしていた
 - 修正: キャプチャクラスに `s` を追加、terminator に `（` / `(` を追加（`scripts/fetch-llm-bench.mjs`）。`npm run bench:fetch` 再生成 + `npm run build`
 - 検証: puppeteer で**全 41 行**を逐一行クリックし、ポップアップの decode / prefill を JSON と突合 → ALL PASS（hipfire = 147.06 / 4,266.54 T/s 等）
+
+### 2026-11-14 データ更新（41 → 51 行）
+- `npm run bench:fetch` 再実行: atom1 19→28 / atom2 7→8 / wb2026 15→15（計 51 行）。GitHub 側は node からの `spawnSync git` が EPERM で落ちたため、シェルで shallow clone して `--wb-dir` を渡す運用で回避（clone は scratch 直下に置く。git-bash の `/tmp` に置くと node 側が ENOENT になる）
+- 新規行（atom1 9 行）: `qwen3codernext_exl3`（Qwen3-Coder-Next 80B A3B / EXL3 6.0bpw、decode 60.18 → 15 位）・`qwen3codernext_nvfp4`（同 NVFP4 / vLLM 0.32.0-aarch64、prefill **6,048.2 T/s = 全 51 件中トップ** → 19 位）・`qwen38flashnextexl3_sc3p68`（EXL3 Self-Calibrated 3.68bpw → 22 位）・`nanbeige43` / `nanbeige43nospec`（Nanbeige4.3-33B FP8 / SGLang + DFLASH2、6.59 → 11.36 T/s = 1.72 倍の A/B）・`ripplea` / `ripplead` / `rippleexl3` / `rippleexl3d`（Ripple-65B Preview 4 経路、NVFP4 3.93 → DFlash2 10.11 T/s = 2.59 倍、EXL3 6.79、DFlash2-EXL3 は未計測）
+- 新規行（atom2 1 行）: `qwen3vl`（Qwen3-VL-8B-Instruct FP8 / vLLM-Radiance 1.0.425・OCR/VL 専用ライン。decode/prefill 未測定、実行状況に OCR 正答 27/33 等の記載）
+- 再計測: `atom2:qwen38hipfire`（hipfire 0.4.5→0.4.6、decode 147.06→154.62 / prefill 4,266.54→4,225.2、3 位維持）、`atom1:qwen38flashnext_nvfp4`（vLLM 0.31→0.33、41.41→44.11 / 2,851.7）、`atom1:Muse`（llama.cpp b11706→b12233、23.31 / 819.8）、`atom1:qwen38`（19.05 / 952.67）、`atom1:qwen38sglang`（12.42 / 2,355.7）
+- atom2 表ヘッダー「2026-11-01 時点」→「2026-11-11 時点」で atom2 全行の計測日が 2026-11-11 へ
+- MODEL_IDS 追加: `atom2:qwen3vl` = `Qwen/Qwen3-VL-8B-Instruct-FP8`（README 記載どおり）。atom1 新規 9 行は README に提供者名表記が無いため null のまま（推測で埋めない運用は不変）
+- 計測日の手動補正（「計測日と備考の運用」の新項参照）: 11-10 再計測節の対象 `Muse` / `qwen38` / `qwen38sglang` / `qwen38flashnext_nvfp4` / `ripplea` / `qwen38flashnextexl3_sc3p68` → 2026-11-10、`nanbeige43` / `nanbeige43nospec` → 2026-11-01（README 実測日）、`ripplead` / `rippleexl3` → 2026-11-09、`rippleexl3d` → 空欄（未計測）。wb2026 の `strata15` / `strataS4` / `strataU4` → 2026-10-12（README「測定日」注記の Strata 5 モード = 0.1.43 実測日）。`llmjp` / `qwen9` / `exl` は README に記載無く空欄のまま
+- 記事 lead 以下の「みどころは～」段落を 2026-11-14 版に刷新（prefill トップ 6,048 T/s、Ripple の投機 2.59 倍、Nanbeige A/B、Qwen3-VL 追加、hipfire 0.4.6）。記事日を 2026-11-14 に更新
+- `npm run build` 成功、dist に `192.168` が 0 件。puppeteer（`vite preview`・1440px）: `nav-sub = 2026-11-14`、lead 2 段落、表 51 行、「51 環境（データ生成日 2026-11-13）」、先頭行 decode 224 / prefill 5,326
