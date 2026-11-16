@@ -2,20 +2,34 @@ import { useEffect, useRef } from 'react';
 
 /**
  * ベンチマーク行の詳細諸元ポップアップ
- *  - 背景クリック / Esc で閉じる
- *  - 開いたときに閉じるボタンへフォーカスを移す
+ *  - ネイティブ <dialog> + showModal(): フォーカストラップ / Esc / 背景の inert 化はブラウザが処理
+ *  - closedby="any" でライトディミット（背景クリックで閉じる）
+ *  - closedby 非対応ブラウザ（Safari 等）は背景クリック検出でフォールバック
  */
 export default function BenchDetailModal({ row, onClose }) {
-  const closeRef = useRef(null);
+  const dialogRef = useRef(null);
 
   useEffect(() => {
-    closeRef.current?.focus();
-    const onKey = (e) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+    const d = dialogRef.current;
+    if (!d) return;
+    d.showModal();
+    if (!('closedBy' in HTMLDialogElement.prototype)) {
+      // Fallback for browsers without closedby support
+      const onBackdropClick = (e) => {
+        // 背景クリック時は event target が dialog 本体になる
+        if (e.target !== d) return;
+        const rect = d.getBoundingClientRect();
+        const isDialogContent =
+          rect.top <= e.clientY &&
+          e.clientY <= rect.top + rect.height &&
+          rect.left <= e.clientX &&
+          e.clientX <= rect.left + rect.width;
+        if (!isDialogContent) d.close();
+      };
+      d.addEventListener('click', onBackdropClick);
+      return () => d.removeEventListener('click', onBackdropClick);
+    }
+  }, []);
 
   const specs = [
     ['機種名', row.machine],
@@ -40,22 +54,20 @@ export default function BenchDetailModal({ row, onClose }) {
   ];
 
   return (
-    <div className="bench-modal-scrim" onClick={onClose}>
-      <div
-        className="bench-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label={row.model + ' の詳細諸元'}
-        onClick={(e) => e.stopPropagation()}
-      >
+    <dialog
+      ref={dialogRef}
+      className="bench-modal"
+      closedby="any"
+      aria-label={row.model + ' の詳細諸元'}
+      onClose={onClose}
+    >
         <div className="bench-modal-head">
           <h3 className="bench-modal-title">{row.model || row.launcher}</h3>
           <button
             type="button"
             className="bench-modal-close"
             aria-label="閉じる"
-            onClick={onClose}
-            ref={closeRef}
+            onClick={() => dialogRef.current?.close()}
           >
             ×
           </button>
@@ -116,7 +128,6 @@ export default function BenchDetailModal({ row, onClose }) {
           </a>
         </p>
       )}
-      </div>
-    </div>
+    </dialog>
   );
 }

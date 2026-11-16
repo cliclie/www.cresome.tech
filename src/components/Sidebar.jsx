@@ -12,13 +12,14 @@ export default function Sidebar({ items, onSelect, bgMode, onBgModeChange }) {
       <nav className="nav">
         {items.map((it) => (
           <div key={it.id} className={'nav-group' + (it.spaced ? ' nav-group--spaced' : '')}>
-            <div
+            <button
+              type="button"
               className={'nav-item' + (it.active ? ' active' : '')}
               data-nav={it.id}
               onClick={() => onSelect(it.id)}
             >
               {it.label}
-            </div>
+            </button>
             {it.sublabel && <div className="nav-sub">{it.sublabel}</div>}
           </div>
         ))}

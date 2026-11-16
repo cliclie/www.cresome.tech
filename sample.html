@@ -22,6 +22,10 @@
       --line: rgba(31, 42, 84, 0.09);
       --card: #ffffff;
       --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+      /* スクロールバー（scrollbar-color 用。サムはトラック・背景比 3:1 以上を確保） */
+      --scrollbar-thumb: rgba(31, 42, 84, 0.5);
+      --scrollbar-thumb-hover: rgba(239, 91, 0, 0.7);
+      --scrollbar-track: var(--bg);
     }
 
     * { box-sizing: border-box; }
@@ -382,19 +386,27 @@
     .info-value { font-size: 15.5px; color: var(--navy); letter-spacing: 0.02em; word-break: auto-phrase; }
     .info-value a {
       color: var(--navy);
-      text-decoration: none;
-      border-bottom: 1px solid rgba(31, 42, 84, 0.25);
-      transition: color 0.3s ease, border-color 0.3s ease;
+      text-decoration: underline;
+      text-decoration-color: rgba(31, 42, 84, 0.25);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 2px;
+      transition: color 0.3s ease, text-decoration-color 0.3s ease;
     }
-    .info-value a:hover { color: var(--accent); border-color: var(--accent); }
+    .info-value a:hover { color: var(--accent); text-decoration-color: var(--accent); }
 
     ::selection { background: rgba(239, 91, 0, 0.16); }
 
-    /* Custom scrollbar */
-    ::-webkit-scrollbar { width: 10px; }
-    ::-webkit-scrollbar-track { background: var(--bg); }
-    ::-webkit-scrollbar-thumb { background: rgba(31, 42, 84, 0.16); border-radius: 6px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(239, 91, 0, 0.5); }
+    /* Custom scrollbar（標準プロパティ + legacy fallback） */
+    html {
+      scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+      scrollbar-width: thin;
+    }
+    @supports not (scrollbar-color: auto) {
+      ::-webkit-scrollbar { width: 10px; }
+      ::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+      ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 6px; }
+      ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+    }
 
     /* ---------- Responsive ---------- */
     @media (max-width: 640px) {

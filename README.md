@@ -347,3 +347,19 @@ three.js で読み込める GLB レイヤー群と最短経路を生成します
 - **検証**: `npm run build` 成功（JS 920.45 kB・gzip 251.08 kB / llm-bench 65.79 kB・gzip 13.12 kB / CSS 26.17 kB・gzip 6.20 kB）。JSON 全 41 行の decode / prefill テキスト突合（欠落 0 件）、dist に `192.168` が 0 件、puppeteer（`vite preview`・1440px）で全 41 行を逐一行クリックしポップアップの decode / prefill を JSON と突合 → ALL PASS
 - **公開（実施済み 2026-11-07）**: `main` へ2コミットを push（`c455993..df0a861` = `13af6d4` feat(articles) → `df0a861` docs(clinerules)）。`npm run deploy` は vite 8.3.5 でビルド（304 ms、JS 907.08 kB・gzip 247.02 kB / llm-bench 65.89 kB・gzip 13.16 kB / CSS 26.17 kB・gzip 6.20 kB）後に `publish` へ `86f39ba` を push（`assets/index-BFpJY82V.js` → `index-CuC4uyhq.js` へ更新、`assets/llm-bench-0lNqhiJq.js` → `llm-bench-C7luE_zk.js` に置換）
   - https://www.cresome.tech/ が `./assets/index-CuC4uyhq.js` を参照し、`index-CuC4uyhq.js` 907,089 B / `index-DJdGyglj.css` 26,171 B / `llm-bench-C7luE_zk.js` 65,893 B（41 環境）の3点がいずれも 200 を返し、llm-bench チャンクに新3モデル（`hipfire` / `Ornith 1.5 122B` / `DeepSeek-V4.1-Flash-1017`）が含まれ `192.168` が 0 件、旧 `llm-bench-0lNqhiJq.js` は 404 であることを実測確認
+
+### 2026-11-16: Modern Web Guidance（mwg）の導入と HTML/CSS/JS のモダナイズ
+
+- **契機**: Gitea（`http://192.168.0.101:3000/gitadmin/mwg`）の `mwg` リポジトリ（GoogleChrome/modern-web-guidance v1.0.0 完全ピン留めのローカル導入 + 配布リポジトリ）を本ワークスペースの Cline 環境に導入し、同梱のルール（`.clinerules/03-modern-web-guidance.md`）に従ってモダナイズ可能なコードの監査・修正を行った
+- **mwg 導入（この PC: Windows ネイティブ）**:
+  - リポジトリは `d:\cresome.tech\mwg` に clone（**移動不可** — ランチャーが `node_modules` への絶対パスを参照）
+  - Git Bash で `bash scripts/install.sh` 実行 → verify 7/7 OK（bash ランチャー `C:\Users\tomoa\.local\bin\modern-web-guidance` + スキル `C:\Users\tomoa\.cline\skills\modern-web-guidance\SKILL.md` + グローバルルール `C:\Users\tomoa\.clinerules\03-modern-web-guidance.md`）
+  - Windows ネイティブ補完: `modern-web-guidance.cmd` ラッパー（`DISABLE_TELEMETRY=1` 強制注入）を `C:\Users\tomoa\.local\bin\` に作成しユーザー PATH に追加、`setx DISABLE_TELEMETRY 1`
+  - 旧環境の explorer.exe から起動した VS Code に新 PATH が継承されない既知の挙動のため、`C:\Users\tomoa\AppData\Local\Microsoft\WindowsApps\modern-web-guidance.cmd` シムも配置（ログオフ/ログオンで本来の PATH 経由に復帰。シムはフォールバックとして残置）
+- **変更（モダナイズ4件）**:
+  1. `BenchDetailModal.jsx` のレガシーモダール（`div` + `role="dialog"` + `aria-modal` + 手動 Esc / フォーカス管理・フォーカストラップなし・背景 inert 化なし）をネイティブ `<dialog closedby="any">` + `showModal()` に置換。`closedby` 非対応ブラウザ（Safari 等）向けに背景クリック検出のフォールバックを同梱。CSS は `.bench-modal-scrim` を廃止し `.bench-modal::backdrop` に置換
+  2. リンクの下線ハック（`text-decoration: none` + `border-bottom`）5 箇所（`src/index.css` ×4 / `sample.html` ×1）をネイティブ `text-decoration` + `text-decoration-thickness` + `text-underline-offset` + `text-decoration-color` に置換（不安定機能 `text-decoration-skip-spaces` は opt-in ゲートがあるため不使用）
+  3. スクロールバーを `scrollbar-color` / `scrollbar-width: thin`（標準・`html` 指定で継承）に統一し、旧 `::-webkit-scrollbar` はガイドどおり `@supports not (scrollbar-color: auto)` に退避。サム色は WCAG 1.4.11（3:1 以上）準拠のため `rgba(31,42,84,0.16)` → `0.5`（約 3.1:1）へ変更
+  4. サイドバー・ドロワーのナビ項目を `div`+`onClick` から `<button type="button">` に置換（キーボード操作・フォーカスリングを獲得）。CSS に button リセット（`display: block; width: 100%; text-align: left` 等）を追加
+- **問題なしと確認した箇所**: `BenchTable`（セマンティック table + `aria-sort` + 行のキーボード対応済み）、Canvas 背景3種（`visibilitychange` / `prefers-reduced-motion` 済み）、`index.html`（preconnect / 旧ブラウザ feature-detect 済み）
+- **検証**: `modern-web-guidance legacy-scan` が 11 件（修正前）→ **0 件**（修正後）。`npm run build` 成功。puppeteer（`vite preview`・1440px）プローブ 12/12 PASS（`dialog` の `open` / `:modal` / `closedby="any"` / `::backdrop` 描画 / ネイティブフォーカストラップ、Esc 閉じる、背景クリック閉じる（ライトディミット）、nav 10 件が `<button>`、下線 computed `underline` / offset 2px / thickness 1px、scrollbar computed `thin`、JS エラー 0）

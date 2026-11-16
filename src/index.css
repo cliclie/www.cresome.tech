@@ -23,6 +23,10 @@
   --line: rgba(31, 42, 84, 0.09);
   --card: #ffffff;
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  /* スクロールバー（scrollbar-color 用。サムはトラック・背景比 3:1 以上を確保） */
+  --scrollbar-thumb: rgba(31, 42, 84, 0.5);
+  --scrollbar-thumb-hover: rgba(239, 91, 0, 0.7);
+  --scrollbar-track: var(--bg);
 }
 
 * { box-sizing: border-box; }
@@ -70,11 +74,17 @@ body {
 }
 .nav-item {
   position: relative;
+  display: block;
+  width: 100%;
   padding: 11px 14px;
   font-size: 15px;
   letter-spacing: 0.08em;
   color: var(--muted);
   cursor: pointer;
+  border: none;
+  background: none;
+  font-family: inherit;
+  text-align: left;
   border-radius: 8px;
   transition: color 0.3s ease, background 0.3s ease;
 }
@@ -780,11 +790,13 @@ body {
 .info-value { font-size: 15.5px; color: var(--navy); letter-spacing: 0.02em; word-break: auto-phrase; }
 .info-value a {
   color: var(--navy);
-  text-decoration: none;
-  border-bottom: 1px solid rgba(31, 42, 84, 0.25);
-  transition: color 0.3s ease, border-color 0.3s ease;
+  text-decoration: underline;
+  text-decoration-color: rgba(31, 42, 84, 0.25);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  transition: color 0.3s ease, text-decoration-color 0.3s ease;
 }
-.info-value a:hover { color: var(--accent); border-color: var(--accent); }
+.info-value a:hover { color: var(--accent); text-decoration-color: var(--accent); }
 
 /* ---------- 記事（Articles） ---------- */
 .articles-layout {
@@ -897,11 +909,13 @@ body {
 .article-sources { display: flex; flex-wrap: wrap; gap: 4px 16px; }
 .article-sources a {
   color: var(--navy);
-  text-decoration: none;
-  border-bottom: 1px solid rgba(31, 42, 84, 0.25);
-  transition: color 0.3s ease, border-color 0.3s ease;
+  text-decoration: underline;
+  text-decoration-color: rgba(31, 42, 84, 0.25);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  transition: color 0.3s ease, text-decoration-color 0.3s ease;
 }
-.article-sources a:hover { color: var(--accent); border-color: var(--accent); }
+.article-sources a:hover { color: var(--accent); text-decoration-color: var(--accent); }
 .article-note {
   max-width: 900px;
   margin: 18px 0 0;
@@ -1017,8 +1031,9 @@ body {
 }
 .bench-model-id a {
   color: inherit;
-  text-decoration: none;
-  border-bottom: 1px dotted rgba(31, 42, 84, 0.4);
+  text-decoration: underline dotted;
+  text-decoration-color: rgba(31, 42, 84, 0.4);
+  text-underline-offset: 2px;
 }
 .bench-model-id a:hover { color: var(--accent); }
 .bench-mem-kind { display: block; font-size: 10px; color: var(--faint); }
@@ -1046,27 +1061,21 @@ body {
   color: var(--faint);
 }
 
-/* ---------- 詳細諸元ポップアップ ---------- */
-.bench-modal-scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: rgba(31, 42, 84, 0.34);
-  animation: benchFadeIn 0.25s ease both;
-}
+/* ---------- 詳細諸元ポップアップ（ネイティブ <dialog>） ---------- */
 .bench-modal {
-  width: min(680px, 100%);
+  width: min(680px, calc(100% - 48px));
   max-height: min(80vh, 720px);
+  margin: auto;
   padding: 26px 28px;
   overflow: auto;
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: 18px;
   box-shadow: 0 30px 60px -28px rgba(31, 42, 84, 0.4);
+}
+.bench-modal::backdrop {
+  background: rgba(31, 42, 84, 0.34);
+  animation: benchFadeIn 0.25s ease both;
 }
 @keyframes benchFadeIn {
   from { opacity: 0; }
@@ -1133,11 +1142,13 @@ body {
 }
 .bench-spec dd a {
   color: var(--navy);
-  text-decoration: none;
-  border-bottom: 1px solid rgba(31, 42, 84, 0.25);
+  text-decoration: underline;
+  text-decoration-color: rgba(31, 42, 84, 0.25);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
   word-break: break-all;
 }
-.bench-spec dd a:hover { color: var(--accent); border-color: var(--accent); }
+.bench-spec dd a:hover { color: var(--accent); text-decoration-color: var(--accent); }
 .bench-modal-note {
   margin: 16px 0 0;
   font-size: 12px;
@@ -1166,11 +1177,18 @@ body {
 
 ::selection { background: rgba(239, 91, 0, 0.16); }
 
-/* Custom scrollbar */
-::-webkit-scrollbar { width: 10px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: rgba(31, 42, 84, 0.16); border-radius: 6px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(239, 91, 0, 0.5); }
+/* Custom scrollbar（標準プロパティ。scrollbar-color/width は継承されるため html 指定で全体に効く） */
+html {
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width: thin;
+}
+/* Legacy fallback for WebKit/Blink browsers */
+@supports not (scrollbar-color: auto) {
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+  ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 6px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+}
 
 /* ---------- Responsive ---------- */
 /* 記事ページ: 横幅が確保できない場合は一覧ペインを本文の上に積む */
