@@ -115,7 +115,7 @@ publish ブランチには以下のファイルのみ存在します:
 
 - メニューは「トップ」〜「会社概要」より間隔を広げ、直下に記事の最新更新日を表示します（`Sidebar.jsx` / `Drawer.jsx` 共通、`.nav-group--spaced` と `.nav-sub`）
 - 記事の追加は、本文を `src/pages/articles/` に置いて `src/data/articles/index.js` の `ARTICLES` に登録するだけ（メニュー側の変更不要）
-- **記事1「ローカル環境でローカルLLMをローカルな条件でベンチマーク」**: 自社内 3 台（AI TOP ATOM / whitebearatom2 / Whitebear2026）の環境設定リポジトリの README から `npm run bench:fetch`（`scripts/fetch-llm-bench.mjs`）が生成した 41 環境の一覧。15 列（順位・モデル名・重み名・decode・prefill・コンテキスト長・使用メモリ・機種名・OS・CPU・搭載RAM・推論エンジン・エンジン版・計測日・備考）を全列ソートでき、ヘッダー行と先頭 2 列は固定、行クリックで詳細諸元をポップアップします。一覧はブラウザ幅に追従し、社内 IP は公開バンドルに含めません
+- **記事1「ローカル環境でローカルLLMをローカルな条件でベンチマーク」**: 自社内 3 台（AI TOP ATOM / whitebearatom2 / Whitebear2026）の環境設定リポジトリの README から `npm run bench:fetch`（`scripts/fetch-llm-bench.mjs`）が生成した 55 環境の一覧。15 列（順位・モデル名・重み名・decode・prefill・コンテキスト長・使用メモリ・機種名・OS・CPU・搭載RAM・推論エンジン・エンジン版・計測日・備考）を全列ソートでき、ヘッダー行と先頭 2 列は固定、行クリックで詳細諸元をポップアップします。一覧はブラウザ幅に追従し、社内 IP は公開バンドルに含めません
 
 ## 背景エフェクト
 
@@ -365,3 +365,11 @@ three.js で読み込める GLB レイヤー群と最短経路を生成します
 - **検証**: `modern-web-guidance legacy-scan` が 11 件（修正前）→ **0 件**（修正後）。`npm run build` 成功。puppeteer（`vite preview`・1440px）プローブ 12/12 PASS（`dialog` の `open` / `:modal` / `closedby="any"` / `::backdrop` 描画 / ネイティブフォーカストラップ、Esc 閉じる、背景クリック閉じる（ライトディミット）、nav 10 件が `<button>`、下線 computed `underline` / offset 2px / thickness 1px、scrollbar computed `thin`、JS エラー 0）
 - **公開（実施済み 2026-11-16）**: `main` へ `55ee52e` を push。`npm run deploy` は vite 8.3.5 でビルド（249 ms、JS 907.33 kB・gzip 247.16 kB / llm-bench 83.62 kB・gzip 16.25 kB / CSS 27.18 kB・gzip 6.32 kB）後に `publish` へ `569e507` を push（`assets/index-Boggpz0L.js` → `index-PanhVfD5.js`、`assets/index-DJdGyglj.css` → `index-DJCmqzru.css` に置換）
   - https://www.cresome.tech/ が `./assets/index-PanhVfD5.js` を参照し、`index-PanhVfD5.js` / `index-DJCmqzru.css` / `llm-bench-2TWd-VbB.js` の3点がいずれも 200 を返し、旧 `index-Boggpz0L.js` / `index-DJdGyglj.css` が 404 であることを実測確認
+
+### 2026-11-18: ローカルLLMベンチマークのデータ更新（51 → 55 環境）
+
+- **契機**: `DGXSparkLLMEnv` の README が「2026-11-14（Unsloth Dynamic 3.1 GGUF を追加し 27B / Flash-Next で A/B）」節で llama.cpp **b12211** の GGUF 4 環境を追加したため `npm run bench:fetch` を再実行（GitHub 側はシェルで shallow clone して `--wb-dir` を渡す運用。wb2026 README の最終コミットは 2026-11-07、atom2 表ヘッダーは「2026-11-11 時点」のまま）
+- **変更**: `llm-bench.json` が 51 → 55 行（atom1: 28→32 / atom2 8→8 / wb2026 15→15）。新規行は `qwen38flashnextgguf`（Flash-Next 125B A6B UD-Q3_K_XL・32.65 T/s → 27 位）・`qwen38ggufq4`（27B UD-Q4_K_XL・29.09 T/s → 31 位）・`qwen38flashnextggufq4`（同 UD-Q4_K_XL・ctx 65,536・27.92 T/s → 32 位）・`qwen38gguf`（27B UD-Q8_K_XL・21.45 T/s → 35 位）。既存行の性能値はすべて不変で、順位は新規 4 行の挿入分だけシフト。記事 lead の「みどころは～」段落を刷新（UD-Q4_K_XL は FP8 比 decode +49.9%・PPL 1.9379→1.8687、Flash-Next UD-Q3_K_XL は現用 EXL3 4.05bpw 比 −31% で現用維持、GB10 の統合メモリ上限で MTP/mmproj/ctx 262,144 を同時ロード不可）、記事日を 2026-11-18 に更新、本 README の記事説明を「55 環境」に更新
+- **補正（抽出ロジックは変えず JSON 側で運用。詳細は [ARTICLES.md](./ARTICLES.md) の該当項）**: ① `qwen38flashnextgguf` はセル「32.65 T/s（EXL3 4.05bpw 47.33 T/s 比 −31%）」を「平均」の無いセルの最大値採用で `parseRate` が 47.33 と読むため、生成後に 32.65 へ補正（順位 22→27） ② README の「測定日」注記に名前が並ばない節は全環境注記の 2026-09-24 が塗られるため、新規 GGUF 4 行と対照の `qwen38flashnextexl3_4p05` → 2026-11-14、11-10 再計測節の 6 行 → 2026-11-10、`ripplead` / `rippleexl3` → 2026-11-09、`nanbeige43` / `nanbeige43nospec` → 2026-11-01、`rippleexl3d` → 空欄 ③ 備考列 `note` を初投入（6 行: GGUF 4 行の A/B 条件、`Muse` のエンジン版表記訂正「表は b12233 / 本文で実測 b12211 と明記」、`rippleexl3d` の未計測）。MODEL_IDS は README に HuggingFace の提供者名表記が無いため追加なし（推測で埋めない運用）
+- **検証**: `npm run build` 成功（JS 907.45 kB・gzip 247.28 kB / llm-bench 90.17 kB・gzip 17.66 kB / CSS 27.18 kB・gzip 6.32 kB）、dist に `192.168` が 0 件。puppeteer（`vite preview`・1440px）で `nav-sub = 2026-11-18`・`article-date = 更新日 2026-11-18`・lead 2 段落・表 55 行・「55 環境（データ生成日 2026-11-18）」・`tableW/scrollW = 1591 / clientW = 842`・`.reveal` の opacity 0 が 0 件、**全 55 行**を逐一行クリックしてポップアップの decode / prefill / 計測日 / 備考と表の数値を JSON と突合 → ALL PASS（fails 0・js errors 0）
+

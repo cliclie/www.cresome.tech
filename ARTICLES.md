@@ -44,7 +44,7 @@ npm run bench:fetch
 - **ビルド時スナップショット方式**: 公開サイトから社内 IP を実行時に叩きません。生成 JSON をコミットし、バンドルに焼き込みます。
 - 失敗時: 表が見つからない・0 行なら非ゼロ終了し、既存 JSON を保持します（README 側の表構成変更の検知）。
 - `main()` は直接実行時のみ走り、パース関数は export しているので単体で検証できます。
-- 記事の遅延読み込み: JSON は `src/data/articles/useBench.js` の動的 `import()` で取得します（別チャンク ≈55 kB / gzip 10 kB。静的 import だと three.js 由来のメインバンドルに載る）。
+- 記事の遅延読み込み: JSON は `src/data/articles/useBench.js` の動的 `import()` で取得します（別チャンク ≈90 kB / gzip 17.7 kB。静的 import だと three.js 由来のメインバンドルに載る）。
 
 ### 出典 URL を載せるかどうか
 
@@ -67,6 +67,9 @@ npm run bench:fetch
 - 「平均 X」があれば X、無ければ第1ブロック内の最大値
 - `同上` は直前行を継承。範囲（`〜`）は上限。`14.2 + 1.4GB` は合計。MiB/GiB 併記は括弧内を優先（`（+163MB）` などの差分表記は除く）。`（空き …）` は捨てる
 - **順位**は decode 代表値の降順で採番（`null` は末尾）
+- **セル内括弧の対照値に注意**（2026-11-18 確認）: 「`32.65 T/s（EXL3 4.05bpw 47.33 T/s 比 −31%）`」のように括弧内へ対照値を書くセルは、
+  「平均」の無いセルで最大値を採用する `parseRate` が括弧内の 47.33 を拾う。抽出側は他行への影響を避けて変えず、生成後に JSON 側で現行値（32.65）へ補正している
+  （`atom1:qwen38flashnextgguf`。再生成のたびに要補正）
 
 ### 計測日と備考の運用
 - `measuredAt` は README の「測定日: …」注記から `extractMeasuredDates` で自動抽出します。
@@ -77,6 +80,10 @@ npm run bench:fetch
 - `note`（備考）は自動生成しません（既定は空欄）。
 - **手動追記は再生成でも消えません**: `fetch-llm-bench.mjs` が既存 JSON を読み、`note` は常時、`measuredAt` は自動抽出できなかった行について既存値を維持します。`Whitebear2026` の `strata15` / `strataS4` / `strataU4` / `llmjp` / `qwen9` / `exl` の計測日は、README に個別記載が無いため JSON を直接編集して補ってください。`whitebearatom2` の `strata`（2026-10-26 追加）は表ヘッダーの日付が更新されないため、JSON で直接補正していましたが、2026-11-07 にヘッダーが 2026-11-01 へ更新されたため自動抽出されるようになり手動補正は不要になりました。
 - **全環境注記の展開で古い日付が塗られる行に注意**（2026-11-14 確認）: AI TOP ATOM の「測定日: 2026-09-24（全環境一括）」注記は、注記より後に追加された行（Ripple / Nanbeige / SC 量子化 / 11-10 再計測で更新された行）にも 2026-09-24 を展開して塗ります。README の「2026-11-10 再計測」節と各所の「2026-11-01 / 11-09 実測」記載に合わせて、再生成後に JSON 側で上書き補正する（抽出側が「成功」と判定するため既存値維持ロジックが効かない）。対象は検証履歴の 2026-11-14 項参照。
+- **README の「測定日」注記に名前が並ばない節も 09-24 に塗られる**（2026-11-18 確認）: 「**2026-11-14 実測（Unsloth Dynamic 3.1 GGUF 4 環境）**」のような節は
+  `extractMeasuredDates` の対象行（`測定日` を含む行）ではないため、全環境注記の 2026-09-24 が残る。再生成後に JSON で上書き補正し、
+  補正一覧は scratch 直下の `patch-bench.mjs`（`measuredAt` / `note` / 代表値補正と順位再計算）として保持している
+- **備考（`note`）は手動運用**: 2026-11-18 から GGUF 4 行・`Muse`・`rippleexl3d` に入れた（6 行）。`note` は再生成で常に既存値が維持される
 
 ## 既知の制限
 
@@ -132,3 +139,14 @@ npm run bench:fetch
 - 計測日の手動補正（「計測日と備考の運用」の新項参照）: 11-10 再計測節の対象 `Muse` / `qwen38` / `qwen38sglang` / `qwen38flashnext_nvfp4` / `ripplea` / `qwen38flashnextexl3_sc3p68` → 2026-11-10、`nanbeige43` / `nanbeige43nospec` → 2026-11-01（README 実測日）、`ripplead` / `rippleexl3` → 2026-11-09、`rippleexl3d` → 空欄（未計測）。wb2026 の `strata15` / `strataS4` / `strataU4` → 2026-10-12（README「測定日」注記の Strata 5 モード = 0.1.43 実測日）。`llmjp` / `qwen9` / `exl` は README に記載無く空欄のまま
 - 記事 lead 以下の「みどころは～」段落を 2026-11-14 版に刷新（prefill トップ 6,048 T/s、Ripple の投機 2.59 倍、Nanbeige A/B、Qwen3-VL 追加、hipfire 0.4.6）。記事日を 2026-11-14 に更新
 - `npm run build` 成功、dist に `192.168` が 0 件。puppeteer（`vite preview`・1440px）: `nav-sub = 2026-11-14`、lead 2 段落、表 51 行、「51 環境（データ生成日 2026-11-13）」、先頭行 decode 224 / prefill 5,326
+
+### 2026-11-18 データ更新（51 → 55 行）
+- `npm run bench:fetch` 再実行: atom1 28→32 / atom2 8→8 / wb2026 15→15（計 55 行）。GitHub 側はシェルで shallow clone して `--wb-dir` を渡す運用（`D:\cresome.tech\scratch\Whitebear2026-WSL2`）。wb2026 README の最終コミットは 2026-11-07、atom2 表ヘッダーは「2026-11-11 時点」のまま（両機は行数・性能値とも変化なし）
+- 新規行（atom1 4 行・llama.cpp **b12211** の Unsloth Dynamic 3.1 GGUF、2026-11-14 実測の A/B warm 値）: `qwen38flashnextgguf`（Flash-Next 125B A6B UD-Q3_K_XL・32.65 T/s → 27 位）・`qwen38ggufq4`（27B UD-Q4_K_XL・29.09 T/s → 31 位）・`qwen38flashnextggufq4`（同 UD-Q4_K_XL・ctx 65,536・27.92 T/s → 32 位）・`qwen38gguf`（27B UD-Q8_K_XL・21.45 T/s → 35 位）
+- 既存行の性能値はすべて不変（順位は新規 4 行の挿入分だけシフト）。README の A/B 知見（27B UD-Q4_K_XL は FP8 比 decode +49.9%・MemAvailable 51.9→69.1GB・PPL 1.9379→1.8687、Flash-Next UD-Q3_K_XL は現用 EXL3 4.05bpw 比 −31% で現用維持）は記事 lead のみどころ段落に反映
+- decode 代表値の補正（「数値の代表値ルール」の新項参照）: `qwen38flashnextgguf` はセル「32.65 T/s（EXL3 4.05bpw 47.33 T/s 比 −31%）」を `parseRate` が 47.33 と読むため JSON で 32.65 に補正（順位 22→27）
+- 計測日の手動補正（「計測日と備考の運用」の新項参照）: 新規 GGUF 4 行と対照の `qwen38flashnextexl3_4p05` → 2026-11-14、11-10 再計測節の `Muse` / `qwen38` / `qwen38sglang` / `qwen38flashnext_nvfp4` / `qwen38flashnextexl3_sc3p68` / `ripplea` → 2026-11-10、`ripplead` / `rippleexl3` → 2026-11-09、`nanbeige43` / `nanbeige43nospec` → 2026-11-01、`rippleexl3d` → 空欄（未計測）。補正後の分布は 09-24×16 / 11-11×8 / 11-10×6 / 11-14×5 / 11-09×4 / 11-01×2 / 10-12×3 / 10-30×2 / 空欄×4
+- 備考（`note`）を初投入（6 行）: GGUF 4 行に A/B 条件と現用比・`qwen38flashnextggufq4` は「MTP・mmproj なし／ctx 65,536（品質計測専用）」、`Muse` に「README 表のエンジン版 b12233 は 2026-11-14 節で表記誤りと訂正（実測 b12211）」、`rippleexl3d` に「未計測」
+- MODEL_IDS 追加なし: GGUF 4 行は README に HuggingFace の提供者名表記が無いため null のまま（atom1 README の `huggingface.co` リンクは全体で 1 箇所のみ）
+- 記事 lead 以下の「みどころは～」段落を 2026-11-18 版に刷新（GGUF 4 本、UD-Q4_K_XL の decode +49.9%・PPL 3.6% 良好、Flash-Next は −31% で現用維持、GB10 のロード上限）。記事日を 2026-11-18 に更新
+- `npm run build` 成功（llm-bench チャンク 90.17 kB / gzip 17.66 kB）、dist に `192.168` が 0 件。puppeteer（`vite preview`・1440px）: `nav-sub = 2026-11-18`、`article-date = 更新日 2026-11-18`、lead 2 段落、表 55 行、「55 環境（データ生成日 2026-11-18）」、`tableW/scrollW = 1591 / clientW = 842`、`.reveal` の opacity 0 は 0 件。**全 55 行**を逐一行クリックし、ポップアップの decode / prefill / 計測日 / 備考と表の数値を JSON と突合 → ALL PASS（fails 0・js errors 0）

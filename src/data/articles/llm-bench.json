@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-13",
+  "generatedAt": "2026-11-18",
   "note": "自社内のローカルLLM環境 3台で実測した推論性能の一覧。数値は各環境設定リポジトリ README の集計値（decode 500 トークン / prefill 約 10,800 トークン 基準）。環境状態が異なる値は比較できないため、絶対値の比較は同一セッションの対測値に限る。",
   "machines": [
     {
@@ -44,7 +44,7 @@
       "machineKey": "atom1",
       "machine": "AI TOP ATOM",
       "url": null,
-      "rows": 28
+      "rows": 32
     },
     {
       "machineKey": "atom2",
@@ -1069,7 +1069,7 @@
       "engineVersion": "1.6.5",
       "engineText": "TabbyAPI + ExLlamaV3 1.6.5（2026-10-28 採用。2026-11-10 に 1.6.6 を A/B → 不採用：warm decode −13%・MTP 受入 −6.6pt。下表の decode / prefill は 1.6.3 時点の実測）",
       "speculative": "内蔵 MTP（8 tok・受入 58.7%）",
-      "measuredAt": "2026-09-24",
+      "measuredAt": "2026-11-14",
       "note": "",
       "port": "8016",
       "os": "Ubuntu 24.04",
@@ -1226,6 +1226,51 @@
       "rank": 26
     },
     {
+      "id": "atom1:qwen38flashnextgguf",
+      "machineKey": "atom1",
+      "machine": "AI TOP ATOM",
+      "launcher": "qwen38flashnextgguf",
+      "model": "Qwen3.8 Flash-Next 125B A6B",
+      "modelId": null,
+      "weights": "UD-Q3_K_XL・arch qwen4exp + PLE",
+      "weightSize": 89.45,
+      "decode": 32.65,
+      "decodeText": "32.65 T/s（EXL3 4.05bpw 47.33 T/s 比 −31%）",
+      "prefill": 887.12,
+      "prefillText": "887.12 T/s",
+      "context": 262144,
+      "contextText": "262,144（GGUF ネイティブ）/ llama.cpp 管理・--lazy-mode auto",
+      "memoryKind": "統合メモリ",
+      "memoryNote": "起動後アイドル時の MemAvailable（ホスト 121.6GiB 中の空き）。値が大きいほど余裕がある＝消費が少ない",
+      "memory": 8.2,
+      "memoryText": "MemAvailable 8.2 GB",
+      "engine": "llama.cpp",
+      "engineVersion": "b12211",
+      "engineText": "llama.cpp b12211（同上）",
+      "speculative": "内蔵 MTP（--spec-type draft-mtp・8 tok。受入率は未露出）",
+      "measuredAt": "2026-11-14",
+      "note": "UD3.1 GGUF A/B（warm・2026-11-14）。現用 EXL3 4.05bpw 47.33 T/s 比 −31%",
+      "port": "8030",
+      "os": "Ubuntu 24.04",
+      "cpu": "NVIDIA GB10",
+      "ram": "128GB（CPU/GPU 共有）",
+      "gpu": "GB10（sm_121・ドライバ 580.178.04）",
+      "sourceUrl": null,
+      "raw": {
+        "ランチャー": "qwen38flashnextgguf",
+        "推論エンジン": "llama.cpp b12211（同上）",
+        "モデル": "Qwen3.8 Flash-Next 125B A6B（UD-Q3_K_XL・arch qwen4exp + PLE）",
+        "重み": "83.31 GiB（本体 56.49 + PLE 26.82・4 分割）+ mmproj-F16 0.86 + MTP-Q8_0 4.14",
+        "コンテキスト / KV": "262,144（GGUF ネイティブ）/ llama.cpp 管理・--lazy-mode auto",
+        "投機デコード": "内蔵 MTP（--spec-type draft-mtp・8 tok。受入率は未露出）",
+        "メモリ": "MemAvailable 8.2 GB",
+        "decode": "32.65 T/s（EXL3 4.05bpw 47.33 T/s 比 −31%）",
+        "prefill": "887.12 T/s",
+        "Port": "8030"
+      },
+      "rank": 27
+    },
+    {
       "id": "atom2:magn",
       "machineKey": "atom2",
       "machine": "whitebearatom2",
@@ -1267,7 +1312,7 @@
         "APIポート": "10100",
         "実行状況": "✅ 起動可（decode 30.52/28.87 T/s・prefill 573.88/570.70 T/s。実 VRAM 23.1GB・空き 9.5GB。60K NIAH PASS。2026-10-17 に 0.2.7→0.2.9 で速度 -3〜-6% と引き換えに VRAM -1.3GB。Vision は不可）"
       },
-      "rank": 27
+      "rank": 28
     },
     {
       "id": "atom1:qwen38sglangdspark",
@@ -1312,7 +1357,7 @@
         "prefill": "2,083.6 T/s",
         "Port": "8008"
       },
-      "rank": 28
+      "rank": 29
     },
     {
       "id": "atom1:qwen38sglangdflash",
@@ -1357,7 +1402,97 @@
         "prefill": "1,800.4 T/s",
         "Port": "8008"
       },
-      "rank": 29
+      "rank": 30
+    },
+    {
+      "id": "atom1:qwen38ggufq4",
+      "machineKey": "atom1",
+      "machine": "AI TOP ATOM",
+      "launcher": "qwen38ggufq4",
+      "model": "Qwen 3.8 27B",
+      "modelId": null,
+      "weights": "UD-Q4_K_XL",
+      "weightSize": 17.66,
+      "decode": 29.09,
+      "decodeText": "29.09 T/s",
+      "prefill": 753.43,
+      "prefillText": "753.43 T/s",
+      "context": 262144,
+      "contextText": "262,144（GGUF ネイティブ・YaRN 不要）/ llama.cpp 管理",
+      "memoryKind": "統合メモリ",
+      "memoryNote": "起動後アイドル時の MemAvailable（ホスト 121.6GiB 中の空き）。値が大きいほど余裕がある＝消費が少ない",
+      "memory": 69.1,
+      "memoryText": "MemAvailable 69.1 GB",
+      "engine": "llama.cpp",
+      "engineVersion": "b12211",
+      "engineText": "llama.cpp b12211（ghcr.io/ggml-org/llama.cpp:server-cuda を SHA 固定・2026-11-14 追加）",
+      "speculative": "内蔵 MTP（--spec-type draft-mtp・3 tok。受入率はログ/metrics 未公開）",
+      "measuredAt": "2026-11-14",
+      "note": "UD3.1 GGUF A/B（warm・2026-11-14）。FP8 比 decode +49.9%・PPL 3.6% 良好",
+      "port": "8029",
+      "os": "Ubuntu 24.04",
+      "cpu": "NVIDIA GB10",
+      "ram": "128GB（CPU/GPU 共有）",
+      "gpu": "GB10（sm_121・ドライバ 580.178.04）",
+      "sourceUrl": null,
+      "raw": {
+        "ランチャー": "qwen38ggufq4",
+        "推論エンジン": "同上（同一イメージ）",
+        "モデル": "Qwen 3.8 27B（UD-Q4_K_XL）",
+        "重み": "16.45 GiB（+ 同上）",
+        "コンテキスト / KV": "同上",
+        "投機デコード": "内蔵 MTP（--spec-type draft-mtp・3 tok。受入率はログ/metrics 未公開）",
+        "メモリ": "MemAvailable 69.1 GB",
+        "decode": "29.09 T/s",
+        "prefill": "753.43 T/s",
+        "Port": "8029"
+      },
+      "rank": 31
+    },
+    {
+      "id": "atom1:qwen38flashnextggufq4",
+      "machineKey": "atom1",
+      "machine": "AI TOP ATOM",
+      "launcher": "qwen38flashnextggufq4",
+      "model": "Qwen3.8 Flash-Next 125B A6B",
+      "modelId": null,
+      "weights": "UD-Q3_K_XL・arch qwen4exp + PLE",
+      "weightSize": 111.33,
+      "decode": 27.92,
+      "decodeText": "27.92 T/s（MTP なし）",
+      "prefill": 926.28,
+      "prefillText": "926.28 T/s",
+      "context": 65536,
+      "contextText": "65,536（262,144 + MTP + mmproj は GB10 で積めず MemAvailable 2 GB / swap 12 GB に落ち prefill が落ちた）",
+      "memoryKind": "統合メモリ",
+      "memoryNote": "起動後アイドル時の MemAvailable（ホスト 121.6GiB 中の空き）。値が大きいほど余裕がある＝消費が少ない",
+      "memory": 2,
+      "memoryText": "MemAvailable 2.0 GB",
+      "engine": "llama.cpp",
+      "engineVersion": "b12211",
+      "engineText": "llama.cpp b12211（同上）",
+      "speculative": "なし（MTP 4.14 GiB を外した）",
+      "measuredAt": "2026-11-14",
+      "note": "MTP・mmproj なし／ctx 65,536（262,144 は GB10 に積めず）。品質計測専用",
+      "port": "8031",
+      "os": "Ubuntu 24.04",
+      "cpu": "NVIDIA GB10",
+      "ram": "128GB（CPU/GPU 共有）",
+      "gpu": "GB10（sm_121・ドライバ 580.178.04）",
+      "sourceUrl": null,
+      "raw": {
+        "ランチャー": "qwen38flashnextggufq4",
+        "推論エンジン": "同上（同一イメージ）",
+        "モデル": "同上（UD-Q4_K_XL）",
+        "重み": "103.68 GiB（本体 76.86 + PLE 26.82）",
+        "コンテキスト / KV": "65,536（262,144 + MTP + mmproj は GB10 で積めず MemAvailable 2 GB / swap 12 GB に落ち prefill が落ちた）",
+        "投機デコード": "なし（MTP 4.14 GiB を外した）",
+        "メモリ": "MemAvailable 2.0 GB",
+        "decode": "27.92 T/s（MTP なし）",
+        "prefill": "926.28 T/s",
+        "Port": "8031"
+      },
+      "rank": 32
     },
     {
       "id": "atom1:Muse",
@@ -1383,7 +1518,7 @@
       "engineText": "llama.cpp b12233（ggml-org 公式・digest pin。2026-11-10 に b11706 から採用、下表の実測を更新）",
       "speculative": "dflash-kquant（内蔵ドラフト・受入 57.2%・mean len 2.71）",
       "measuredAt": "2026-11-10",
-      "note": "",
+      "note": "README 表のエンジン版 b12233 は 2026-11-14 節で表記誤りと訂正（実測 b12211）",
       "port": "8004",
       "os": "Ubuntu 24.04",
       "cpu": "NVIDIA GB10",
@@ -1402,7 +1537,7 @@
         "prefill": "819.8 T/s",
         "Port": "8004"
       },
-      "rank": 30
+      "rank": 33
     },
     {
       "id": "atom1:qwen38sglangeagle",
@@ -1447,7 +1582,52 @@
         "prefill": "2,245.7 T/s",
         "Port": "8008"
       },
-      "rank": 31
+      "rank": 34
+    },
+    {
+      "id": "atom1:qwen38gguf",
+      "machineKey": "atom1",
+      "machine": "AI TOP ATOM",
+      "launcher": "qwen38gguf",
+      "model": "Qwen 3.8 27B",
+      "modelId": null,
+      "weights": "Unsloth Dynamic 3.1 UD-Q8_K_XL・arch qwen35",
+      "weightSize": 31.46,
+      "decode": 21.45,
+      "decodeText": "21.45 T/s",
+      "prefill": 607.34,
+      "prefillText": "607.34 T/s",
+      "context": 262144,
+      "contextText": "262,144（GGUF ネイティブ・YaRN 不要）/ llama.cpp 管理",
+      "memoryKind": "統合メモリ",
+      "memoryNote": "起動後アイドル時の MemAvailable（ホスト 121.6GiB 中の空き）。値が大きいほど余裕がある＝消費が少ない",
+      "memory": 56.1,
+      "memoryText": "MemAvailable 56.1 GB",
+      "engine": "llama.cpp",
+      "engineVersion": "b12211",
+      "engineText": "llama.cpp b12211（ghcr.io/ggml-org/llama.cpp:server-cuda を SHA 固定・2026-11-14 追加）",
+      "speculative": "内蔵 MTP（--spec-type draft-mtp・3 tok。受入率はログ/metrics 未公開）",
+      "measuredAt": "2026-11-14",
+      "note": "UD3.1 GGUF A/B（warm・2026-11-14）。FP8 比 prefill −35.9%／decode +10.6%",
+      "port": "8028",
+      "os": "Ubuntu 24.04",
+      "cpu": "NVIDIA GB10",
+      "ram": "128GB（CPU/GPU 共有）",
+      "gpu": "GB10（sm_121・ドライバ 580.178.04）",
+      "sourceUrl": null,
+      "raw": {
+        "ランチャー": "qwen38gguf",
+        "推論エンジン": "llama.cpp b12211（ghcr.io/ggml-org/llama.cpp:server-cuda を SHA 固定・2026-11-14 追加）",
+        "モデル": "Qwen 3.8 27B（Unsloth Dynamic 3.1 UD-Q8_K_XL・arch qwen35）",
+        "重み": "29.30 GiB（+ mmproj-F16 0.86 + MTP-Q4_0 1.28）",
+        "コンテキスト / KV": "262,144（GGUF ネイティブ・YaRN 不要）/ llama.cpp 管理",
+        "投機デコード": "内蔵 MTP（--spec-type draft-mtp・3 tok。受入率はログ/metrics 未公開）",
+        "メモリ": "MemAvailable 56.1 GB",
+        "decode": "21.45 T/s",
+        "prefill": "607.34 T/s",
+        "Port": "8028"
+      },
+      "rank": 35
     },
     {
       "id": "atom1:qwen38nvfp4",
@@ -1492,7 +1672,7 @@
         "prefill": "1,508.6 T/s",
         "Port": "8007"
       },
-      "rank": 32
+      "rank": 36
     },
     {
       "id": "atom1:qwen38",
@@ -1537,7 +1717,7 @@
         "prefill": "952.67 T/s",
         "Port": "8005"
       },
-      "rank": 33
+      "rank": 37
     },
     {
       "id": "wb2026:strataD4",
@@ -1582,7 +1762,7 @@
         "prefill": "17.1 T/s（23 tok・0.1.51）→ cold 7,213 tok で 85.4 → 550.2 T/s（TTFT 84.4 → 13.1 s）（0.1.52）",
         "Port": "8080"
       },
-      "rank": 34
+      "rank": 38
     },
     {
       "id": "atom1:qwen38swift_dflash",
@@ -1627,7 +1807,7 @@
         "prefill": "1,254.4 T/s",
         "Port": "8012"
       },
-      "rank": 35
+      "rank": 39
     },
     {
       "id": "atom1:mimo9b",
@@ -1672,7 +1852,7 @@
         "prefill": "3,806.6 T/s†",
         "Port": "8014"
       },
-      "rank": 36
+      "rank": 40
     },
     {
       "id": "atom1:qwen38sglang",
@@ -1717,7 +1897,7 @@
         "prefill": "2,355.7 T/s",
         "Port": "8008"
       },
-      "rank": 37
+      "rank": 41
     },
     {
       "id": "atom1:qwen38bf16",
@@ -1762,7 +1942,7 @@
         "prefill": "1,316.4 T/s†",
         "Port": "8006"
       },
-      "rank": 38
+      "rank": 42
     },
     {
       "id": "atom1:qwen38swift",
@@ -1807,7 +1987,7 @@
         "prefill": "1,278.6 T/s†",
         "Port": "8012"
       },
-      "rank": 39
+      "rank": 43
     },
     {
       "id": "atom1:nanbeige43",
@@ -1852,7 +2032,7 @@
         "prefill": "1,447.7 T/s",
         "Port": "8019"
       },
-      "rank": 40
+      "rank": 44
     },
     {
       "id": "atom1:glm53flash_mosaic",
@@ -1897,7 +2077,7 @@
         "prefill": "292.4 T/s",
         "Port": "8017"
       },
-      "rank": 41
+      "rank": 45
     },
     {
       "id": "atom1:ripplead",
@@ -1942,7 +2122,7 @@
         "prefill": "499.53 T/s",
         "Port": "8023"
       },
-      "rank": 42
+      "rank": 46
     },
     {
       "id": "wb2026:swiftqwen38",
@@ -1987,7 +2167,7 @@
         "prefill": "252K を ~154 秒（~1,650 T/s）",
         "Port": "8040"
       },
-      "rank": 43
+      "rank": 47
     },
     {
       "id": "atom1:rippleexl3",
@@ -2032,7 +2212,7 @@
         "prefill": "349.71 T/s",
         "Port": "8026"
       },
-      "rank": 44
+      "rank": 48
     },
     {
       "id": "atom1:nanbeige43nospec",
@@ -2077,7 +2257,7 @@
         "prefill": "1,509.7 T/s",
         "Port": "8019"
       },
-      "rank": 45
+      "rank": 49
     },
     {
       "id": "atom1:ripplea",
@@ -2122,7 +2302,7 @@
         "prefill": "510.76 T/s",
         "Port": "8022"
       },
-      "rank": 46
+      "rank": 50
     },
     {
       "id": "atom2:qwen38sglangrocm",
@@ -2166,7 +2346,7 @@
         "APIポート": "8006",
         "実行状況": "❌ ロード失敗（起動不可）。AWQ は gptq_marlin_repack が ROCm ビルドに無し。MXFP4 は AITER の is_fp4_avail() が gfx950/gfx1250 限定で gfx1201 は MXFP4 is not available on your device。2026-10-06 に再現確認"
       },
-      "rank": 47
+      "rank": 51
     },
     {
       "id": "atom2:qwen3vl",
@@ -2210,7 +2390,7 @@
         "APIポート": "8013",
         "実行状況": "✅ 起動可（実物OCR 5項目 27/33=81.8%・登録番号の幻覚 0 件／1件 avg 1.74 秒・pt 425-1217（hipfire 比 30% 速く画像トークン約半）。モデルロード 1.93 秒・起動 2分40秒・VRAM 30.2GB。2026-11-11 追加。1.0.425 は上流で \"not production-qualified\"（認定 TP2・本機 TP1）なので既存 27B 系の 1.0.397 は据え置き）"
       },
-      "rank": 48
+      "rank": 52
     },
     {
       "id": "wb2026:qwen9",
@@ -2255,7 +2435,7 @@
         "prefill": "—",
         "Port": "5003"
       },
-      "rank": 49
+      "rank": 53
     },
     {
       "id": "wb2026:exl",
@@ -2300,7 +2480,7 @@
         "prefill": "—",
         "Port": "8888"
       },
-      "rank": 50
+      "rank": 54
     },
     {
       "id": "atom1:rippleexl3d",
@@ -2326,7 +2506,7 @@
       "engineText": "TabbyAPI + ExLlamaV3 1.6.6 + feat/ricursive（auryn-macmillan fork・SHA 固定・local/tabbyapi-arm64:ripple）",
       "speculative": "DFLASH2 EXL3（8 tok・dynamic。作者受入 3–6%・\"not recommended\"）",
       "measuredAt": "",
-      "note": "",
+      "note": "未計測（2026-11-14 節で追加、DFlash2 EXL3 は作者受入 3–6%）",
       "port": "8027",
       "os": "Ubuntu 24.04",
       "cpu": "NVIDIA GB10",
@@ -2345,7 +2525,7 @@
         "prefill": "未計測",
         "Port": "8027"
       },
-      "rank": 51
+      "rank": 55
     }
   ]
 }
