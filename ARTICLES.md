@@ -84,6 +84,7 @@ npm run bench:fetch
   `extractMeasuredDates` の対象行（`測定日` を含む行）ではないため、全環境注記の 2026-09-24 が残る。再生成後に JSON で上書き補正し、
   補正一覧は scratch 直下の `patch-bench.mjs`（`measuredAt` / `note` / 代表値補正と順位再計算）として保持している
 - **備考（`note`）は手動運用**: 2026-11-18 から GGUF 4 行・`Muse`・`rippleexl3d` に入れた（6 行）。`note` は再生成で常に既存値が維持される
+- **atom2 の表ヘッダー日付より後に追加された行**（2026-11-23 確認）: `atom2:clef`（README 上 2026-11-21 追加）には表ヘッダー「2026-11-11 時点」が適用されるため、`patch-bench.mjs` の FIX で 2026-11-21 に補正（備考も同時投入）
 
 ## 既知の制限
 
@@ -150,3 +151,11 @@ npm run bench:fetch
 - MODEL_IDS 追加なし: GGUF 4 行は README に HuggingFace の提供者名表記が無いため null のまま（atom1 README の `huggingface.co` リンクは全体で 1 箇所のみ）
 - 記事 lead 以下の「みどころは～」段落を 2026-11-18 版に刷新（GGUF 4 本、UD-Q4_K_XL の decode +49.9%・PPL 3.6% 良好、Flash-Next は −31% で現用維持、GB10 のロード上限）。記事日を 2026-11-18 に更新
 - `npm run build` 成功（llm-bench チャンク 90.17 kB / gzip 17.66 kB）、dist に `192.168` が 0 件。puppeteer（`vite preview`・1440px）: `nav-sub = 2026-11-18`、`article-date = 更新日 2026-11-18`、lead 2 段落、表 55 行、「55 環境（データ生成日 2026-11-18）」、`tableW/scrollW = 1591 / clientW = 842`、`.reveal` の opacity 0 は 0 件。**全 55 行**を逐一行クリックし、ポップアップの decode / prefill / 計測日 / 備考と表の数値を JSON と突合 → ALL PASS（fails 0・js errors 0）
+
+### 2026-11-23 データ更新（55 → 56 行）
+- `npm run bench:fetch` 再実行: atom1 32→32 / atom2 8→9 / wb2026 15→15（計 56 行）。GitHub 側は既存クローン（`D:\cresome.tech\scratch\Whitebear2026-WSL2`）を pull して `--wb-dir` を渡す運用。atom1 README・wb2026 README（最終コミット 2026-11-07）は変化無く、atom2 のみ 2026-11-21 の `clef` 節が新行として反映された
+- 新規行（atom2 1 行）: `atom2:clef`（Clef-Flash 9B / llama.cpp b12180 Vulkan・port 8014。**判定専用（decision）モデル**で生成しないため decode / prefill 該当なし（`—`）→ 順位は末尾帯の 51。VRAM 20.6GB・text 133〜288ms / 画像 604ms・systemone 検証 6/6 通過
+- MODEL_IDS 追加: `atom2:clef` = `Cloudflare/clef-flash`（README 2026-11-21 節に実在する表記。ggml-org は GGUF 配布元でモデル ID ではない）
+- 再生成による既知の退行（全環境注記の 09-24 塗りが 17 行分逆戻り・`qwen38flashnextgguf` の decode 47.33 誤読）を `patch-bench.mjs` で一掃（FIX に `atom2:clef` の計測日 2026-11-21・備考を追加済み。以後の再生成も同一スクリプトで復旧する）
+- 記事 lead の「みどころは～」段落を 2026-11-23 版に刷新（Clef-Flash の特徴 + 前回 GGUF A/B の結果要約）。記事日を 2026-11-23 に更新
+- `npm run build` 成功（llm-bench チャンク 92.5 kB / gzip 17.96 kB）、dist に `192.168` が 0 件。puppeteer（`vite preview`・1440px）: `nav-sub = 2026-11-23`、`article-date = 更新日 2026-11-23`、lead 2 段落、表 56 行、「56 環境（データ生成日 2026-11-23）」、`tableW = 1591`、`.reveal` の opacity 0 は 0 件。**全 56 行**を逐一行クリックし、表セル（decode / prefill / 計測日 / 備考）と詳細ポップアップを JSON と突合 → ALL PASS（fails 0・js errors 0）

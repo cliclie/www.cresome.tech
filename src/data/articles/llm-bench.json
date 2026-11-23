@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-18",
+  "generatedAt": "2026-11-23",
   "note": "自社内のローカルLLM環境 3台で実測した推論性能の一覧。数値は各環境設定リポジトリ README の集計値（decode 500 トークン / prefill 約 10,800 トークン 基準）。環境状態が異なる値は比較できないため、絶対値の比較は同一セッションの対測値に限る。",
   "machines": [
     {
@@ -50,7 +50,7 @@
       "machineKey": "atom2",
       "machine": "whitebearatom2",
       "url": null,
-      "rows": 8
+      "rows": 9
     },
     {
       "machineKey": "wb2026",
@@ -2305,6 +2305,50 @@
       "rank": 50
     },
     {
+      "id": "atom2:clef",
+      "machineKey": "atom2",
+      "machine": "whitebearatom2",
+      "launcher": "clef",
+      "model": "Clef-Flash 9B（decision モデル＝生成しない）。Cloudflare が Qwen3.5-9B を post-train + joint schema head 243MB。state（text/JSON/画像）× 型付き質問を 1 prefill で全 option 判定",
+      "modelId": "Cloudflare/clef-flash",
+      "weights": "ggml-org 公式 GGUF BF16 18.16GB + mmproj-BF16 0.92GB（head は GGUF 内蔵。architecture=clef / decision_type=clef）",
+      "weightSize": 19.08,
+      "decode": null,
+      "decodeText": "—",
+      "prefill": null,
+      "prefillText": "—",
+      "context": 262144,
+      "contextText": "262,144（実効は -ub の 16,384 tok）",
+      "memoryKind": "VRAM",
+      "memoryNote": "ディスクリート GPU の実測 VRAM（32.6GB 中・sysfs サンプリング）",
+      "memory": 20.6,
+      "memoryText": "20.6GB（実測）",
+      "engine": "llama.cpp",
+      "engineVersion": "b12180",
+      "engineText": "llama.cpp b12180 Vulkan（既存イメージ流用・再ビルド不要。/v1/systemone）",
+      "speculative": "—",
+      "measuredAt": "2026-11-21",
+      "note": "判定専用（decision）モデル。生成しないため decode/prefill 該当なし（/v1/systemone のみ・chat は 501）。text 133〜288ms・画像 604ms・systemone 検証 6/6 通過",
+      "port": "8014",
+      "os": "Ubuntu 26.04",
+      "cpu": "Intel Core i9-12900KF",
+      "ram": "32GB",
+      "gpu": "AMD Radeon AI PRO R9700 32GB（gfx1201 / RDNA4）",
+      "sourceUrl": null,
+      "raw": {
+        "切替コマンド": "./clef.sh",
+        "サービス": "clef_flash",
+        "モデル": "Clef-Flash 9B（decision モデル＝生成しない）。Cloudflare が Qwen3.5-9B を post-train + joint schema head 243MB。state（text/JSON/画像）× 型付き質問を 1 prefill で全 option 判定",
+        "量子化": "ggml-org 公式 GGUF BF16 18.16GB + mmproj-BF16 0.92GB（head は GGUF 内蔵。architecture=clef / decision_type=clef）",
+        "エンジン": "llama.cpp b12180 Vulkan（既存イメージ流用・再ビルド不要。/v1/systemone）",
+        "最大コンテキスト": "262,144（実効は -ub の 16,384 tok）",
+        "KVキャッシュ": "q8_0（full attention は 32層中 8層のみ）",
+        "APIポート": "8014",
+        "実行状況": "✅ 起動可（text 133〜288ms・画像 604ms／VRAM 20.6GB・ロード 5秒。systemone 検証 6ケース全通過：France 0.9836・sky 0.9822・grass 誤命題 false 0.9720・billing 0.9769・invoice JSON overdue 0.9730／large 0.9729・実物スキャンで invoice 0.9640。2026-11-21 追加）"
+      },
+      "rank": 51
+    },
+    {
       "id": "atom2:qwen38sglangrocm",
       "machineKey": "atom2",
       "machine": "whitebearatom2",
@@ -2346,7 +2390,7 @@
         "APIポート": "8006",
         "実行状況": "❌ ロード失敗（起動不可）。AWQ は gptq_marlin_repack が ROCm ビルドに無し。MXFP4 は AITER の is_fp4_avail() が gfx950/gfx1250 限定で gfx1201 は MXFP4 is not available on your device。2026-10-06 に再現確認"
       },
-      "rank": 51
+      "rank": 52
     },
     {
       "id": "atom2:qwen3vl",
@@ -2390,7 +2434,7 @@
         "APIポート": "8013",
         "実行状況": "✅ 起動可（実物OCR 5項目 27/33=81.8%・登録番号の幻覚 0 件／1件 avg 1.74 秒・pt 425-1217（hipfire 比 30% 速く画像トークン約半）。モデルロード 1.93 秒・起動 2分40秒・VRAM 30.2GB。2026-11-11 追加。1.0.425 は上流で \"not production-qualified\"（認定 TP2・本機 TP1）なので既存 27B 系の 1.0.397 は据え置き）"
       },
-      "rank": 52
+      "rank": 53
     },
     {
       "id": "wb2026:qwen9",
@@ -2435,7 +2479,7 @@
         "prefill": "—",
         "Port": "5003"
       },
-      "rank": 53
+      "rank": 54
     },
     {
       "id": "wb2026:exl",
@@ -2480,7 +2524,7 @@
         "prefill": "—",
         "Port": "8888"
       },
-      "rank": 54
+      "rank": 55
     },
     {
       "id": "atom1:rippleexl3d",
@@ -2525,7 +2569,7 @@
         "prefill": "未計測",
         "Port": "8027"
       },
-      "rank": 55
+      "rank": 56
     }
   ]
 }
