@@ -159,3 +159,4 @@ npm run bench:fetch
 - 再生成による既知の退行（全環境注記の 09-24 塗りが 17 行分逆戻り・`qwen38flashnextgguf` の decode 47.33 誤読）を `patch-bench.mjs` で一掃（FIX に `atom2:clef` の計測日 2026-11-21・備考を追加済み。以後の再生成も同一スクリプトで復旧する）
 - 記事 lead の「みどころは～」段落を 2026-11-23 版に刷新（Clef-Flash の特徴 + 前回 GGUF A/B の結果要約）。記事日を 2026-11-23 に更新
 - `npm run build` 成功（llm-bench チャンク 92.5 kB / gzip 17.96 kB）、dist に `192.168` が 0 件。puppeteer（`vite preview`・1440px）: `nav-sub = 2026-11-23`、`article-date = 更新日 2026-11-23`、lead 2 段落、表 56 行、「56 環境（データ生成日 2026-11-23）」、`tableW = 1591`、`.reveal` の opacity 0 は 0 件。**全 56 行**を逐一行クリックし、表セル（decode / prefill / 計測日 / 備考）と詳細ポップアップを JSON と突合 → ALL PASS（fails 0・js errors 0）
+- 公開: main `3d97867` / publish `49f83e8`（2026-11-23）。本番 `www.cresome.tech` の `index-BRIadnsm.js` に `2026-11-23` と Clef-Flash、`llm-bench-BTu8B71v.js` に `atom2:clef` / `Cloudflare/clef-flash` を確認。公開 JS の `192.168` は 0 件
