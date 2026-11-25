@@ -186,5 +186,6 @@ npm run bench:fetch
 - `npm run build` 成功（llm-bench チャンク 87.06 kB / gzip 17.32 kB）。dist 内の `192.168` は 0 件（生成 JSON も 0 件）
 - puppeteer（`vite preview`・1440px）: `nav-sub = 2026-11-25`、`article-date = 更新日 2026-11-25`、lead 3 段落、表 50 行、「50 環境（データ生成日 2026-11-25）」、`tableW = 1591`、`.reveal` の opacity 0 は 0 件。**全 50 行**を逐一行クリックし、表セル（decode / prefill / 計測日 / 備考）と詳細ポップアップを JSON と突合 → ALL PASS（fails 0・js errors 0）
 - 意図的な空欄: `wb2026:maya` の計測日（README に記載なし）と `atom1:rippleexl3d`（未計測）。モデル名が「—」になるのは `wb2026:strataQ3` / `strataK4` / `strataN4` で、Gitea `WSL-llm` 本文に個別のモデル表記が無いため（HuggingFace 欄は README に実在する ID のみ）
+- 公開: `main` `859be4c` / `publish` `9896cb1`（2026-11-25 09:06）。本番 `www.cresome.tech` の `index.html` は `index-zBj5S5UZ.js` を参照（200）、main JS に `2026-11-25` と「環境（データ生成日」、`llm-bench-Cdi5gH62.js`（200）に `wb2026:clef` / `atom1:qwen38tfm4` / `atom2:hipfire` を確認。公開 JS 内の `192.168` は 0 件。puppeteer を本番へ向けて再実行（`BASE_URL=https://www.cresome.tech`）→ 表 50 行・全 50 行クリック突合 **ALL PASS**（fails 0・js errors 0）
 
 
