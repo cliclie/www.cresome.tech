@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-11-23",
-  "note": "自社内のローカルLLM環境 3台で実測した推論性能の一覧。数値は各環境設定リポジトリ README の集計値（decode 500 トークン / prefill 約 10,800 トークン 基準）。環境状態が異なる値は比較できないため、絶対値の比較は同一セッションの対測値に限る。",
+  "generatedAt": "2026-11-25",
+  "note": "自社内のローカルLLM環境 3台で実測した推論性能の一覧。数値は各環境設定リポジトリ README の集計値（decode 500 トークン / prefill 約 10,800 トークン 基準）。環境状態が異なる値は比較できないため、絶対値の比較は同一セッションの対測値に限る。Whitebear2026 の Strata 系は README の別条件（bench_strata.py r7・256 tok 出力、prefill は 3.5K prompt）で、判定専用（decision）モデルの Clef-Flash は生成しないため decode / prefill がありません。",
   "machines": [
     {
       "key": "atom1",
@@ -35,7 +35,7 @@
       "gpu": "NVIDIA RTX 5090 32GB（sm_120・CUDA 13.1 / ドライバ 615.71）",
       "ram": "86GB（WSL 割当）",
       "memoryKind": "VRAM",
-      "memoryNote": "アイドル時の VRAM 実測（32GB 中）。Strata 系は RAM に Expert を page-lock する",
+      "memoryNote": "アイドル時の VRAM 実測（32GB 中）。maya は RAM への pinned 値、clef は clef/README.md の実測、Strata 系は本文に測定値の記載なし",
       "url": null
     }
   ],
@@ -44,7 +44,7 @@
       "machineKey": "atom1",
       "machine": "AI TOP ATOM",
       "url": null,
-      "rows": 32
+      "rows": 35
     },
     {
       "machineKey": "atom2",
@@ -56,349 +56,35 @@
       "machineKey": "wb2026",
       "machine": "Whitebear2026",
       "url": null,
-      "rows": 15
+      "rows": 6
     }
   ],
   "rows": [
-    {
-      "id": "wb2026:mimo",
-      "machineKey": "wb2026",
-      "machine": "Whitebear2026",
-      "launcher": "mimo",
-      "model": "MiMo-V2.6-Distill-Qwen-9B-FP8（prithivMLmods 派生・MIT 非gated）+ z-lab/Qwen3.5-9B-DFlash ドラフター",
-      "modelId": "prithivMLmods/MiMo-V2.6-Distill-Qwen-9B-FP8",
-      "weights": "12.6 + 1.45GB",
-      "weightSize": 14.05,
-      "decode": 224,
-      "decodeText": "~208-224 T/s（短文）",
-      "prefill": 5326,
-      "prefillText": "252K を 49.3 秒（~5,326 T/s 平均）",
-      "context": 262144,
-      "contextText": "262,144 / fp8_e4m3（FlashInfer + graph）",
-      "memoryKind": "VRAM",
-      "memoryNote": "アイドル時の VRAM 実測（32GB 中）。Strata 系は RAM に Expert を page-lock する",
-      "memory": 29.53,
-      "memoryText": "28,161 MiB（27.5GiB）",
-      "engine": "SGLang",
-      "engineVersion": "nightly-dev-cu13-20260922",
-      "engineText": "SGLang（Docker / nightly-dev-cu13-20260922）",
-      "speculative": "DFlash block=16（accept ~3.8-4.6）",
-      "measuredAt": "2026-09-25",
-      "note": "",
-      "port": "8050",
-      "os": "WSL2 Ubuntu 26.04（Windows ホスト）",
-      "cpu": "Intel Core Ultra 7 270K Plus",
-      "ram": "86GB（WSL 割当）",
-      "gpu": "NVIDIA RTX 5090 32GB（sm_120・CUDA 13.1 / ドライバ 615.71）",
-      "sourceUrl": null,
-      "raw": {
-        "ランチャー": "mimo",
-        "推論エンジン": "SGLang（Docker / nightly-dev-cu13-20260922）",
-        "モデル": "MiMo-V2.6-Distill-Qwen-9B-FP8（prithivMLmods 派生・MIT 非gated）+ z-lab/Qwen3.5-9B-DFlash ドラフター",
-        "重み": "12.6 + 1.45GB",
-        "コンテキスト / KV": "262,144 / fp8_e4m3（FlashInfer + graph）",
-        "投機デコード": "DFlash block=16（accept ~3.8-4.6）",
-        "メモリ": "28,161 MiB（27.5GiB）",
-        "decode": "~208-224 T/s（短文）",
-        "prefill": "252K を 49.3 秒（~5,326 T/s 平均）",
-        "Port": "8050"
-      },
-      "rank": 1
-    },
-    {
-      "id": "wb2026:swift40",
-      "machineKey": "wb2026",
-      "machine": "Whitebear2026",
-      "launcher": "swift40",
-      "model": "Swift-Qwen3.8-27B-EXL3 4.0bpw",
-      "modelId": "erlidev/Swift-Qwen3.8-27B-EXL3",
-      "weights": "erlidev SC_4.00bpw_H5_V6",
-      "weightSize": 16.35,
-      "decode": 168.2,
-      "decodeText": "平均 168.2 T/s / 最大 178.1 T/s（1.6.3・同一スクリプト実測） / 1.4.8: 平均 154.0 / 最大 167.6 / 実運用ログ: 平均 146 / 最大 171",
-      "prefill": 3729,
-      "prefillText": "3,729 T/s（32.8K tok・1.6.3） / 1.4.8: 2,798 T/s",
-      "context": 262144,
-      "contextText": "262,144 / int8(Q8)",
-      "memoryKind": "VRAM",
-      "memoryNote": "アイドル時の VRAM 実測（32GB 中）。Strata 系は RAM に Expert を page-lock する",
-      "memory": 26.31,
-      "memoryText": "25,861 MiB（24.5GiB・アイドル時／1.4.8 では 28,349 MiB）",
-      "engine": "TabbyAPI + ExLlamaV3",
-      "engineVersion": "1.6.6",
-      "engineText": "TabbyAPI 3cacaf2 + exllamav3 1.6.6（2026-11-01 に 1.6.3 から更新）",
-      "speculative": "内蔵 MTP",
-      "measuredAt": "2026-09-24",
-      "note": "",
-      "port": "5001",
-      "os": "WSL2 Ubuntu 26.04（Windows ホスト）",
-      "cpu": "Intel Core Ultra 7 270K Plus",
-      "ram": "86GB（WSL 割当）",
-      "gpu": "NVIDIA RTX 5090 32GB（sm_120・CUDA 13.1 / ドライバ 615.71）",
-      "sourceUrl": null,
-      "raw": {
-        "ランチャー": "swift40",
-        "推論エンジン": "TabbyAPI 3cacaf2 + exllamav3 1.6.6（2026-11-01 に 1.6.3 から更新）",
-        "モデル": "Swift-Qwen3.8-27B-EXL3 4.0bpw（erlidev SC_4.00bpw_H5_V6）",
-        "重み": "16.35GB",
-        "コンテキスト / KV": "262,144 / int8(Q8)",
-        "投機デコード": "内蔵 MTP",
-        "メモリ": "25,861 MiB（24.5GiB・アイドル時／1.4.8 では 28,349 MiB）",
-        "decode": "平均 168.2 T/s / 最大 178.1 T/s（1.6.3・同一スクリプト実測） / 1.4.8: 平均 154.0 / 最大 167.6 / 実運用ログ: 平均 146 / 最大 171",
-        "prefill": "3,729 T/s（32.8K tok・1.6.3） / 1.4.8: 2,798 T/s",
-        "Port": "5001"
-      },
-      "rank": 2
-    },
-    {
-      "id": "atom2:qwen38hipfire",
-      "machineKey": "atom2",
-      "machine": "whitebearatom2",
-      "launcher": "qwen38hipfire",
-      "model": "Qwen 3.8 27B",
-      "modelId": "hipfire-models/qwen3.8-27b",
-      "weights": "hipfire 公式 MQ4V2 XT-symmetric 14.99GB + DFlash draft 1.21GB + MTP head 0.23GB + vision tower 0.93GB（HF hipfire-models/qwen3.8-27b。hipfire は GGUF を serve しないため既存 GGUF/MXFP4 は流用不可）",
-      "weightSize": 17.36,
-      "decode": 154.62,
-      "decodeText": "154.62 T/s",
-      "prefill": 4225.2,
-      "prefillText": "4,225.2 T/s",
-      "context": 262144,
-      "contextText": "262,144（card_cap 429,087。placement: fully resident）",
-      "memoryKind": "VRAM",
-      "memoryNote": "ディスクリート GPU の実測 VRAM（32.6GB 中・sysfs サンプリング）",
-      "memory": 19.06,
-      "memoryText": "19.06GB（実測）",
-      "engine": "hipfire 0.4.6（Rust + HIP ネイティブ・gfx1201 WMMA/Redline。ghcr イメージに prebuilt kernel 焼き込み → ビルド不要）",
-      "engineVersion": "0.4.6",
-      "engineText": "hipfire 0.4.6（Rust + HIP ネイティブ・gfx1201 WMMA/Redline。ghcr イメージに prebuilt kernel 焼き込み → ビルド不要）",
-      "speculative": "fp8（kv_cache=auto を gfx1201 で解決。vmm backend）",
-      "measuredAt": "2026-11-11",
-      "note": "",
-      "port": "8011",
-      "os": "Ubuntu 26.04",
-      "cpu": "Intel Core i9-12900KF",
-      "ram": "32GB",
-      "gpu": "AMD Radeon AI PRO R9700 32GB（gfx1201 / RDNA4）",
-      "sourceUrl": null,
-      "raw": {
-        "切替コマンド": "./qwen38hipfire.sh",
-        "サービス": "hipfire",
-        "モデル": "Qwen 3.8 27B",
-        "量子化": "hipfire 公式 MQ4V2 XT-symmetric 14.99GB + DFlash draft 1.21GB + MTP head 0.23GB + vision tower 0.93GB（HF hipfire-models/qwen3.8-27b。hipfire は GGUF を serve しないため既存 GGUF/MXFP4 は流用不可）",
-        "エンジン": "hipfire 0.4.6（Rust + HIP ネイティブ・gfx1201 WMMA/Redline。ghcr イメージに prebuilt kernel 焼き込み → ビルド不要）",
-        "最大コンテキスト": "262,144（card_cap 429,087。placement: fully resident）",
-        "KVキャッシュ": "fp8（kv_cache=auto を gfx1201 で解決。vmm backend）",
-        "APIポート": "8011",
-        "実行状況": "✅ 起動可（decode 154.62 T/s・prefill 4,225.2 T/s（DFlash auto・2026-11-12 計測。0.4.5 比 decode +5.6%。AR 41.60 / MTP K=3 58.03 T/s は 0.4.5 時の値で 0.4.6 では未再測）。27B 系エンジン中最速（0.4.5 導入時の 2026-11-07 は「既存 5 エンジン中最速」として記録）。モデルロード 3.2 秒（温）/ 11.7 秒（冷）・VRAM 19.06GB。NIAH 120K 42.2s / 250K 135.5s PASS。Vision OK（896×672 画像で図形・色・OCR 4/4 正答。1リクエスト1画像・base64 のみ）"
-      },
-      "rank": 3
-    },
-    {
-      "id": "wb2026:swift35",
-      "machineKey": "wb2026",
-      "machine": "Whitebear2026",
-      "launcher": "swift35",
-      "model": "Swift-Qwen3.8-27B-EXL3 3.5bpw",
-      "modelId": "erlidev/Swift-Qwen3.8-27B-EXL3",
-      "weights": "SC_3.50bpw_H4_V6",
-      "weightSize": 14.67,
-      "decode": 136.9,
-      "decodeText": "136.9 T/s（単発サンプル）",
-      "prefill": null,
-      "prefillText": "—（prompt 59 tok のみ・非代表）",
-      "context": 262144,
-      "contextText": "262,144 / int8(Q8)",
-      "memoryKind": "VRAM",
-      "memoryNote": "アイドル時の VRAM 実測（32GB 中）。Strata 系は RAM に Expert を page-lock する",
-      "memory": 25.6,
-      "memoryText": "25.6GB",
-      "engine": "TabbyAPI + ExLlamaV3",
-      "engineVersion": "1.6.6",
-      "engineText": "TabbyAPI + exllamav3 1.6.6（数値は 1.4.8 時点の実測）",
-      "speculative": "内蔵 MTP",
-      "measuredAt": "2026-09-24",
-      "note": "",
-      "port": "5002",
-      "os": "WSL2 Ubuntu 26.04（Windows ホスト）",
-      "cpu": "Intel Core Ultra 7 270K Plus",
-      "ram": "86GB（WSL 割当）",
-      "gpu": "NVIDIA RTX 5090 32GB（sm_120・CUDA 13.1 / ドライバ 615.71）",
-      "sourceUrl": null,
-      "raw": {
-        "ランチャー": "swift35",
-        "推論エンジン": "TabbyAPI + exllamav3 1.6.6（数値は 1.4.8 時点の実測）",
-        "モデル": "Swift-Qwen3.8-27B-EXL3 3.5bpw（SC_3.50bpw_H4_V6）",
-        "重み": "14.67GB",
-        "コンテキスト / KV": "262,144 / int8(Q8)",
-        "投機デコード": "内蔵 MTP",
-        "メモリ": "25.6GB",
-        "decode": "136.9 T/s（単発サンプル）",
-        "prefill": "—（prompt 59 tok のみ・非代表）",
-        "Port": "5002"
-      },
-      "rank": 4
-    },
-    {
-      "id": "wb2026:strata15",
-      "machineKey": "wb2026",
-      "machine": "Whitebear2026",
-      "launcher": "strata15",
-      "model": "Qwen3.8-Flash-Next 125B MoE — Swift 1.5 GSQ-RCO IQ2_XS",
-      "modelId": "ukisai/Swift-1.5-Qwen3.8-Flash-Next-GSQ-RCO-IQ2_XS",
-      "weights": "2-bit i-quant",
-      "weightSize": 65,
-      "decode": 125.5,
-      "decodeText": "104.1〜125.5 T/s（0.1.43・2026-10-12） / 0.1.40.3: 120.7〜166.2",
-      "prefill": 5013,
-      "prefillText": "183,493 tok を 36.6 秒（5,005〜5,013 T/s） / 45K: 3,974 T/s（0.1.40.3: 2,090）",
-      "context": 262144,
-      "contextText": "262,144 / int8（WSL2 は KV streaming 不可）",
-      "memoryKind": "VRAM",
-      "memoryNote": "アイドル時の VRAM 実測（32GB 中）。Strata 系は RAM に Expert を page-lock する",
-      "memory": 32.32,
-      "memoryText": "30,720〜30,819 MiB 使用 / 1,368〜1,467 MiB 空き",
-      "engine": "Strata",
-      "engineVersion": "0.1.49.2",
-      "engineText": "Strata 0.1.49.2（本機ビルド / sm_120・src b9993e25b7e78735・2026-10-25 に v0.2.4.2 ソースから更新（0.1.46.2→0.1.49.2）。strataQ3 以外は 0.1.43 時点の数値）",
-      "speculative": "内蔵 MTP（--spec 4・受理 61〜64%）",
-      "measuredAt": "2026-10-12",
-      "note": "",
-      "port": "8080",
-      "os": "WSL2 Ubuntu 26.04（Windows ホスト）",
-      "cpu": "Intel Core Ultra 7 270K Plus",
-      "ram": "86GB（WSL 割当）",
-      "gpu": "NVIDIA RTX 5090 32GB（sm_120・CUDA 13.1 / ドライバ 615.71）",
-      "sourceUrl": null,
-      "raw": {
-        "ランチャー": "strata15",
-        "推論エンジン": "Strata 0.1.49.2（本機ビルド / sm_120・src b9993e25b7e78735・2026-10-25 に v0.2.4.2 ソースから更新（0.1.46.2→0.1.49.2）。strataQ3 以外は 0.1.43 時点の数値）",
-        "モデル": "Qwen3.8-Flash-Next 125B MoE — Swift 1.5 GSQ-RCO IQ2_XS（2-bit i-quant）",
-        "重み": "65GB（Expert 14.82 GiB を RAM ロック＝budget 28・SSD に n-gram 28.8GB・VRAM cache 13,578 experts）",
-        "コンテキスト / KV": "262,144 / int8（WSL2 は KV streaming 不可）",
-        "投機デコード": "内蔵 MTP（--spec 4・受理 61〜64%）",
-        "メモリ": "30,720〜30,819 MiB 使用 / 1,368〜1,467 MiB 空き",
-        "decode": "104.1〜125.5 T/s（0.1.43・2026-10-12） / 0.1.40.3: 120.7〜166.2",
-        "prefill": "183,493 tok を 36.6 秒（5,005〜5,013 T/s） / 45K: 3,974 T/s（0.1.40.3: 2,090）",
-        "Port": "8080"
-      },
-      "rank": 5
-    },
-    {
-      "id": "wb2026:bonsai",
-      "machineKey": "wb2026",
-      "machine": "Whitebear2026",
-      "launcher": "bonsai",
-      "model": "PrismML Ternary-Bonsai-2-27B PQ2_0 + mmproj Q8_0",
-      "modelId": "PrismML-Eng/Bonsai-demo",
-      "weights": "7.2 + 0.63GB",
-      "weightSize": 7.83,
-      "decode": 104.6,
-      "decodeText": "79.3〜104.6 T/s",
-      "prefill": 3279,
-      "prefillText": "2,782〜3,279 T/s",
-      "context": 262144,
-      "contextText": "262,144 / Q4_0 + mean-centering bias",
-      "memoryKind": "VRAM",
-      "memoryNote": "アイドル時の VRAM 実測（32GB 中）。Strata 系は RAM に Expert を page-lock する",
-      "memory": 10.41,
-      "memoryText": "9,929 MiB（アイドル）/ 17,398 MiB（61K 使用時）",
-      "engine": "llama.cpp",
-      "engineVersion": "b10709",
-      "engineText": "llama.cpp（PrismML fork prism-b10709 / Docker）",
-      "speculative": "なし",
-      "measuredAt": "2026-09-19",
-      "note": "",
-      "port": "8081",
-      "os": "WSL2 Ubuntu 26.04（Windows ホスト）",
-      "cpu": "Intel Core Ultra 7 270K Plus",
-      "ram": "86GB（WSL 割当）",
-      "gpu": "NVIDIA RTX 5090 32GB（sm_120・CUDA 13.1 / ドライバ 615.71）",
-      "sourceUrl": null,
-      "raw": {
-        "ランチャー": "bonsai",
-        "推論エンジン": "llama.cpp（PrismML fork prism-b10709 / Docker）",
-        "モデル": "PrismML Ternary-Bonsai-2-27B PQ2_0 + mmproj Q8_0",
-        "重み": "7.2 + 0.63GB",
-        "コンテキスト / KV": "262,144 / Q4_0 + mean-centering bias",
-        "投機デコード": "なし",
-        "メモリ": "9,929 MiB（アイドル）/ 17,398 MiB（61K 使用時）",
-        "decode": "79.3〜104.6 T/s",
-        "prefill": "2,782〜3,279 T/s",
-        "Port": "8081"
-      },
-      "rank": 6
-    },
-    {
-      "id": "wb2026:tabby",
-      "machineKey": "wb2026",
-      "machine": "Whitebear2026",
-      "launcher": "tabby",
-      "model": "Qwen3.8-27B-EXL3 3.5bpw",
-      "modelId": null,
-      "weights": "base",
-      "weightSize": 14.2,
-      "decode": 103,
-      "decodeText": "平均 103 T/s / 最大 167 T/s（494 リクエスト集計）",
-      "prefill": 1769,
-      "prefillText": "1,769 T/s（124,698 prompt）",
-      "context": 262144,
-      "contextText": "262,144 / int8(Q8)（KV 約 9.1GB）",
-      "memoryKind": "VRAM",
-      "memoryNote": "アイドル時の VRAM 実測（32GB 中）。Strata 系は RAM に Expert を page-lock する",
-      "memory": 27.7,
-      "memoryText": "27.7GB",
-      "engine": "TabbyAPI + ExLlamaV3",
-      "engineVersion": "1.6.6",
-      "engineText": "TabbyAPI + exllamav3 1.6.6（数値は 1.4.8 時点の実測）",
-      "speculative": "内蔵 MTP",
-      "measuredAt": "2026-09-24",
-      "note": "",
-      "port": "5000",
-      "os": "WSL2 Ubuntu 26.04（Windows ホスト）",
-      "cpu": "Intel Core Ultra 7 270K Plus",
-      "ram": "86GB（WSL 割当）",
-      "gpu": "NVIDIA RTX 5090 32GB（sm_120・CUDA 13.1 / ドライバ 615.71）",
-      "sourceUrl": null,
-      "raw": {
-        "ランチャー": "tabby",
-        "推論エンジン": "TabbyAPI + exllamav3 1.6.6（数値は 1.4.8 時点の実測）",
-        "モデル": "Qwen3.8-27B-EXL3 3.5bpw（base）",
-        "重み": "14.2GB",
-        "コンテキスト / KV": "262,144 / int8(Q8)（KV 約 9.1GB）",
-        "投機デコード": "内蔵 MTP",
-        "メモリ": "27.7GB",
-        "decode": "平均 103 T/s / 最大 167 T/s（494 リクエスト集計）",
-        "prefill": "1,769 T/s（124,698 prompt）",
-        "Port": "5000"
-      },
-      "rank": 7
-    },
     {
       "id": "wb2026:strataQ3",
       "machineKey": "wb2026",
       "machine": "Whitebear2026",
       "launcher": "strataQ3",
-      "model": "ukisai Swift 1.5 GSQ-RCO IQ3_S（3.5bit・公式「最高品質（本体と一致）」帯・2026-10-12 追加）",
+      "model": null,
       "modelId": "ukisai/Swift-1.5-Qwen3.8-Flash-Next-GSQ-RCO-GGUF",
-      "weights": "84GB（Expert 46.84 GiB＝0.1.46.2 では RAM pin 32.39 GiB + VRAM cache 9,033 experts / 17.13 GiB・budget 47・no file reads／同一 A/B の 0.1.45 は pin 32.84 GiB + cache 9,176 / 17.41 GiB）",
-      "weightSize": 84,
-      "decode": 100,
-      "decodeText": "100.0 T/s（0.1.49.2・3.6K streaming ベンチ中央値・2026-10-25） / 74.0〜83.1 T/s（0.1.46.2・4K→183K） / 同一 A/B の 0.1.45: 71.9〜75.5 / 10-20 の 0.1.45+async: 78.1〜81.9",
-      "prefill": 3934,
-      "prefillText": "183,493 tok を 46.6 秒（3,934 T/s） / 4K prefill 2,166 T/s（同一 A/B の 0.1.45: 1,933／10-20 測定: 2,072） / 3.6K prefill 2,135 T/s（0.1.49.2 streaming ベンチ中央値・0.1.46.2 同一方式: 2,303） / 45K: 3,189 T/s（同一 A/B の 0.1.45: 3,055）",
+      "weights": "—",
+      "weightSize": null,
+      "decode": 178.41,
+      "decodeText": "178.41 T/s",
+      "prefill": 2232,
+      "prefillText": "2232 T/s（3.5K prompt）",
       "context": 262144,
-      "contextText": "262,144 / int8",
+      "contextText": "ctx 262144",
       "memoryKind": "VRAM",
-      "memoryNote": "アイドル時の VRAM 実測（32GB 中）。Strata 系は RAM に Expert を page-lock する",
-      "memory": 32.29,
-      "memoryText": "30,495〜30,796 MiB 使用 / 1,176〜1,692 MiB free",
+      "memoryNote": "アイドル時の VRAM 実測（32GB 中）。maya は RAM への pinned 値、clef は clef/README.md の実測、Strata 系は本文に測定値の記載なし",
+      "memory": null,
+      "memoryText": "—",
       "engine": "Strata",
-      "engineVersion": "0.1.49.2",
-      "engineText": "Strata 0.1.49.2（本機ビルド / sm_120・src b9993e25b7e78735・2026-10-25 に v0.2.4.2 ソースから更新（0.1.46.2→0.1.49.2）。strataQ3 以外は 0.1.43 時点の数値）",
-      "speculative": "内蔵 MTP（--spec 4・受理 61〜64%）",
-      "measuredAt": "2026-10-30",
-      "note": "",
+      "engineVersion": "",
+      "engineText": "Strata 9 モード（8080 を共有）。strataK4 / strataN4 は 2026-11-23 に重み削除済み＝機構のみ（一覧では [重み未導入]）。strataI2 = Inkling-2-Mini SQ-20（専用エンジン strata-inkling 0.1.66・.strata v1.1 SF4+MX8 無損失・DSpark 内蔵・26.4B-A3.4B looped MoE・5090 で 100% VRAM 常駐（実測 23.3GB）・ctx 262144（2026-11-23 に 32K→256K へ再設定・実測 56K prompt prefill 3,887 tok/s）・上限 1M・画像対応。重み Strata-data/models/inkling-2-mini/（SHA-256 検証済み）、導入 ./setup.sh --family inkling-2-mini --model SQ-20 --context 262144 --yes）",
+      "speculative": "—",
+      "measuredAt": "2026-11-23",
+      "note": "decode 178.41 / prefill 2232 は 2026-11-23 の ON/OFF 比較（bench_strata.py r7・256 tok 出力・median、prefill は 3.5K prompt）。記事標準条件とは条件が違い、起動間変動は ±10%",
       "port": "8080",
       "os": "WSL2 Ubuntu 26.04（Windows ホスト）",
       "cpu": "Intel Core Ultra 7 270K Plus",
@@ -407,43 +93,129 @@
       "sourceUrl": null,
       "raw": {
         "ランチャー": "strataQ3",
-        "推論エンジン": "同上（このモードのみ 0.1.55 で再実測＝2026-11-01 の同一セッション A/B。serve を v0.2.9 に固定し engine/ だけ 0.1.54 に戻した分離比較: 長文 20K/28K prefill 2,582.2 → 2,688.0 / 2,814.2 T/s（+4.1 / +2.4%）・code decode 54.77 → 58.61 T/s（+7.0%）・all decode 52.53 → 54.35（+3.5%）・story −0.9%、語彙リスト prefill 1,684.0 → 1,545.1・decode 98.92 → 95.18（−8.2 / −3.8%）と符号が割れ、実負荷（コード・散文・tool call・長文）重視で採用。NIAH 9/9・vision 正答・config 差分ゼロ（生データ strata/bench/2026-11-01-0.1.55/）。その前の 0.1.54＝2026-10-30 は語彙リスト系 decode 72.2 → 64.0 T/s（−11%）、code/story 33.1 → 36.3 T/s（+9.7%）。再構成した bench_strata.py は 10-28 とプロンプト文言が異なるため、上表の 100.0 T/s や 2026-10-28 の記載値と直接比較しない（A/B 専用・比較表 strata/bench/2026-10-30-COMPARISON.md）。その前は 0.1.52＝2026-10-28、0.1.49.2＝2026-10-25、0.1.46.2 エンジン差し替え A/B＝2026-10-21）",
-        "モデル": "ukisai Swift 1.5 GSQ-RCO IQ3_S（3.5bit・公式「最高品質（本体と一致）」帯・2026-10-12 追加）",
-        "重み": "84GB（Expert 46.84 GiB＝0.1.46.2 では RAM pin 32.39 GiB + VRAM cache 9,033 experts / 17.13 GiB・budget 47・no file reads／同一 A/B の 0.1.45 は pin 32.84 GiB + cache 9,176 / 17.41 GiB）",
-        "コンテキスト / KV": "262,144 / int8",
-        "投機デコード": "内蔵 MTP（--spec 4・受理 61〜64%）",
-        "メモリ": "30,495〜30,796 MiB 使用 / 1,176〜1,692 MiB free",
-        "decode": "100.0 T/s（0.1.49.2・3.6K streaming ベンチ中央値・2026-10-25） / 74.0〜83.1 T/s（0.1.46.2・4K→183K） / 同一 A/B の 0.1.45: 71.9〜75.5 / 10-20 の 0.1.45+async: 78.1〜81.9",
-        "prefill": "183,493 tok を 46.6 秒（3,934 T/s） / 4K prefill 2,166 T/s（同一 A/B の 0.1.45: 1,933／10-20 測定: 2,072） / 3.6K prefill 2,135 T/s（0.1.49.2 streaming ベンチ中央値・0.1.46.2 同一方式: 2,303） / 45K: 3,189 T/s（同一 A/B の 0.1.45: 3,055）",
+        "対象": "Strata 9 モード（8080 を共有）。strataK4 / strataN4 は 2026-11-23 に重み削除済み＝機構のみ（一覧では [重み未導入]）。strataI2 = Inkling-2-Mini SQ-20（専用エンジン strata-inkling 0.1.66・.strata v1.1 SF4+MX8 無損失・DSpark 内蔵・26.4B-A3.4B looped MoE・5090 で 100% VRAM 常駐（実測 23.3GB）・ctx 262144（2026-11-23 に 32K→256K へ再設定・実測 56K prompt prefill 3,887 tok/s）・上限 1M・画像対応。重み Strata-data/models/inkling-2-mini/（SHA-256 検証済み）、導入 ./setup.sh --family inkling-2-mini --model SQ-20 --context 262144 --yes）",
+        "実体": "llm/Strata",
+        "重み": "—",
+        "decode": "178.41 T/s",
+        "prefill": "2232 T/s（3.5K prompt）",
         "Port": "8080"
       },
-      "rank": 8
+      "rank": 1
     },
     {
-      "id": "wb2026:strataC1",
+      "id": "atom2:hipfire",
+      "machineKey": "atom2",
+      "machine": "whitebearatom2",
+      "launcher": "hipfire",
+      "model": "Qwen 3.8 27B",
+      "modelId": "hipfire-models/qwen3.8-27b",
+      "weights": "hipfire 公式 MQ4V2 XT-symmetric 14.99GB + DFlash draft 1.21GB + MTP head 0.23GB + vision tower 0.93GB（HF hipfire-models/qwen3.8-27b。hipfire は GGUF を serve しないため既存 GGUF/MXFP4 は流用不可）",
+      "weightSize": 17.36,
+      "decode": 154.55,
+      "decodeText": "154.55 T/s",
+      "prefill": 4251.09,
+      "prefillText": "4,251.09 T/s",
+      "context": 262144,
+      "contextText": "262,144（card_cap 429,087。placement: fully resident）",
+      "memoryKind": "VRAM",
+      "memoryNote": "ディスクリート GPU の実測 VRAM（32.6GB 中・sysfs サンプリング）",
+      "memory": 19.06,
+      "memoryText": "19.06GB（実測）",
+      "engine": "hipfire 0.4.7（Rust + HIP ネイティブ・gfx1201 WMMA/Redline。ghcr イメージに prebuilt kernel 焼き込み → ビルド不要。0.4.7 で gfx1201 の cold start が hipcc 不要に）",
+      "engineVersion": "0.4.7",
+      "engineText": "hipfire 0.4.7（Rust + HIP ネイティブ・gfx1201 WMMA/Redline。ghcr イメージに prebuilt kernel 焼き込み → ビルド不要。0.4.7 で gfx1201 の cold start が hipcc 不要に）",
+      "speculative": "fp8（kv_cache=auto を gfx1201 で解決。vmm backend）",
+      "measuredAt": "2026-11-24",
+      "note": "0.4.7 は 0.4.6 比 prefill +1.8%・decode 同等。複数画像を受理。ただし #1079 修正で実物 OCR が 27/33 → 24/33 に後退",
+      "port": "8011",
+      "os": "Ubuntu 26.04",
+      "cpu": "Intel Core i9-12900KF",
+      "ram": "32GB",
+      "gpu": "AMD Radeon AI PRO R9700 32GB（gfx1201 / RDNA4）",
+      "sourceUrl": null,
+      "raw": {
+        "切替コマンド": "hipfire",
+        "サービス": "hipfire",
+        "モデル": "Qwen 3.8 27B",
+        "量子化": "hipfire 公式 MQ4V2 XT-symmetric 14.99GB + DFlash draft 1.21GB + MTP head 0.23GB + vision tower 0.93GB（HF hipfire-models/qwen3.8-27b。hipfire は GGUF を serve しないため既存 GGUF/MXFP4 は流用不可）",
+        "エンジン": "hipfire 0.4.7（Rust + HIP ネイティブ・gfx1201 WMMA/Redline。ghcr イメージに prebuilt kernel 焼き込み → ビルド不要。0.4.7 で gfx1201 の cold start が hipcc 不要に）",
+        "最大コンテキスト": "262,144（card_cap 429,087。placement: fully resident）",
+        "KVキャッシュ": "fp8（kv_cache=auto を gfx1201 で解決。vmm backend）",
+        "APIポート": "8011",
+        "実行状況": "✅ 起動可（decode 154.55 T/s・prefill 4,251.09 T/s（DFlash auto・2026-11-24 計測。0.4.6 対測値 154.50 / 4,175.92 に対し prefill +1.8%・decode 同等）。27B 系エンジン中最速。モデルロード 3.2 秒（温）/ 11.7 秒（冷）・VRAM 19.06GB（起動直後。HIPFIRE_IDLE_TIMEOUT=0 のため 250K NIAH 後は 27.99GB まで増えたまま降りない＝ピーク 28.77GB 実測）。NIAH 120K 40.7s / 250K 131.8s PASS。Vision OK（896×672 画像で図形・色・OCR 4/4 正答。0.4.7 から 1 リクエストの複数画像を受理（2 枚で pt 1517・2026-11-24 実測）、base64 data URI のみは不変でリモート URL は 400。ただし 0.4.7 の #1079 修正で実物 OCR の宛先が 1 文件後退＝ALL 27/33 → 24/33、詳細は 2026-11-24 節）"
+      },
+      "rank": 2
+    },
+    {
+      "id": "atom1:flashnexthibana",
+      "machineKey": "atom1",
+      "machine": "AI TOP ATOM",
+      "launcher": "flashnexthibana",
+      "model": "Qwen3.8 Flash-Next 125B A6B",
+      "modelId": "RadixArk/Qwen3.8-Flash-Next-NVFP4",
+      "weights": "RadixArk/Qwen3.8-Flash-Next-NVFP4@7b719225 + 3bit 校正写し …-w3-qad@5c4c62a6",
+      "weightSize": 56.94,
+      "decode": 120.95,
+      "decodeText": "120.95 T/s",
+      "prefill": 1100.14,
+      "prefillText": "1,100.14 T/s",
+      "context": 262144,
+      "contextText": "262,144 / FP8 E4M3 KV（HIBANA_HOST_FLOOR_GIB=16）",
+      "memoryKind": "統合メモリ",
+      "memoryNote": "起動後アイドル時の MemAvailable（ホスト 121.6GiB 中の空き）。値が大きいほど余裕がある＝消費が少ない",
+      "memory": 20.35,
+      "memoryText": "MemAvailable 21.99→20.35 GB",
+      "engine": "Hibana d474b74（hibana-flashnext:flashnext-d474b74、torch 2.13.0+cu130 / flashinfer 0.6.17+cu130 / b12x 1.5.0）",
+      "engineVersion": "d474b74",
+      "engineText": "Hibana d474b74（hibana-flashnext:flashnext-d474b74、torch 2.13.0+cu130 / flashinfer 0.6.17+cu130 / b12x 1.5.0）",
+      "speculative": "内蔵 MTP（k=8・depth は batch と自适应 2:7,4:6・accept 0.61・4.96 tok/round・round 38.7 ms）",
+      "measuredAt": "2026-11-25",
+      "note": "Hibana d474b74・max_batch 4（1 にすると decode 96.90）。ctx 262,144 がハード上限",
+      "port": "8033",
+      "os": "Ubuntu 24.04",
+      "cpu": "NVIDIA GB10",
+      "ram": "128GB（CPU/GPU 共有）",
+      "gpu": "GB10（sm_121・ドライバ 580.178.04）",
+      "sourceUrl": null,
+      "raw": {
+        "ランチャー": "flashnexthibana",
+        "推論エンジン": "Hibana d474b74（hibana-flashnext:flashnext-d474b74、torch 2.13.0+cu130 / flashinfer 0.6.17+cu130 / b12x 1.5.0）",
+        "モデル": "Qwen3.8 Flash-Next 125B A6B（RadixArk/Qwen3.8-Flash-Next-NVFP4@7b719225 + 3bit 校正写し …-w3-qad@5c4c62a6）",
+        "重み": "常駐 53.03 GiB（KV 9.68 + state 10.12 + proposer/verify 4.61 + graphs 2.73。重みロード 27 s）",
+        "コンテキスト / KV": "262,144 / FP8 E4M3 KV（HIBANA_HOST_FLOOR_GIB=16）",
+        "投機デコード": "内蔵 MTP（k=8・depth は batch と自适应 2:7,4:6・accept 0.61・4.96 tok/round・round 38.7 ms）",
+        "メモリ": "MemAvailable 21.99→20.35 GB",
+        "decode": "120.95 T/s",
+        "prefill": "1,100.14 T/s",
+        "Port": "8033"
+      },
+      "rank": 3
+    },
+    {
+      "id": "wb2026:strataI2",
       "machineKey": "wb2026",
       "machine": "Whitebear2026",
-      "launcher": "strataC1",
-      "model": "ISTA-DASLab Coder IQ1_M",
-      "modelId": "ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF",
-      "weights": "experts 512→256 の pruned・code/tools/vision 特化・2026-10-15 追加",
-      "weightSize": 58.4,
-      "decode": 76.7,
-      "decodeText": "59.9〜76.7 T/s",
-      "prefill": 5916,
-      "prefillText": "366,926 tok を 62.0 秒（5,916 T/s） / 45K: 3,359 T/s",
-      "context": 524288,
-      "contextText": "524,288 / int8＝YaRN factor 2（--rope-scale 2・WSL2 は KV streaming 不可）",
+      "launcher": "strataI2",
+      "model": "Inkling-2-Mini SQ-20",
+      "modelId": "thinkingmachines/Inkling-2-Mini",
+      "weights": "SQ-20 19.35 GB + Vision 0.64 GB",
+      "weightSize": 19.99,
+      "decode": 80.9,
+      "decodeText": "decode 80.9 T/s",
+      "prefill": 1989,
+      "prefillText": "prefill 1,989 T/s",
+      "context": 262144,
+      "contextText": "ctx 262144",
       "memoryKind": "VRAM",
-      "memoryNote": "アイドル時の VRAM 実測（32GB 中）。Strata 系は RAM に Expert を page-lock する",
-      "memory": 32.53,
-      "memoryText": "31,021 MiB 使用 / 1,166 MiB free",
+      "memoryNote": "アイドル時の VRAM 実測（32GB 中）。maya は RAM への pinned 値、clef は clef/README.md の実測、Strata 系は本文に測定値の記載なし",
+      "memory": 23.3,
+      "memoryText": "23.3GB（実測）",
       "engine": "Strata",
-      "engineVersion": "0.1.49.2",
-      "engineText": "Strata 0.1.49.2（本機ビルド / sm_120・src b9993e25b7e78735・2026-10-25 に v0.2.4.2 ソースから更新（0.1.46.2→0.1.49.2）。strataQ3 以外は 0.1.43 時点の数値）",
-      "speculative": "内蔵 MTP（--spec 4・受理 61〜64%）",
-      "measuredAt": "2026-10-15",
-      "note": "",
+      "engineVersion": "0.1.66",
+      "engineText": "Strata 9 モード（8080 を共有）。strataK4 / strataN4 は 2026-11-23 に重み削除済み＝機構のみ（一覧では [重み未導入]）。strataI2 = Inkling-2-Mini SQ-20（専用エンジン strata-inkling 0.1.66・.strata v1.1 SF4+MX8 無損失・DSpark 内蔵・26.4B-A3.4B looped MoE・5090 で 100% VRAM 常駐（実測 23.3GB）・ctx 262144（2026-11-23 に 32K→256K へ再設定・実測 56K prompt prefill 3,887 tok/s）・上限 1M・画像対応。重み Strata-data/models/inkling-2-mini/（SHA-256 検証済み）、導入 ./setup.sh --family inkling-2-mini --model SQ-20 --context 262144 --yes）",
+      "speculative": "—",
+      "measuredAt": "2026-11-23",
+      "note": "単体ベンチ（strata-kit/bench/2026-11-23-inkling-sq20）の実測で、記事標準条件とは条件が違う。56K prompt prefill は 3,887 T/s",
       "port": "8080",
       "os": "WSL2 Ubuntu 26.04（Windows ホスト）",
       "cpu": "Intel Core Ultra 7 270K Plus",
@@ -451,18 +223,15 @@
       "gpu": "NVIDIA RTX 5090 32GB（sm_120・CUDA 13.1 / ドライバ 615.71）",
       "sourceUrl": null,
       "raw": {
-        "ランチャー": "strataC1",
-        "推論エンジン": "同上",
-        "モデル": "ISTA-DASLab Coder IQ1_M（experts 512→256 の pruned・code/tools/vision 特化・2026-10-15 追加）",
-        "重み": "58.4GB（Expert 23.4 GB・budget 無し／VRAM cache 7,066 experts = 13.44 GiB・n-gram 28.8GB は shard2 の PLE 表）",
-        "コンテキスト / KV": "524,288 / int8＝YaRN factor 2（--rope-scale 2・WSL2 は KV streaming 不可）",
-        "投機デコード": "内蔵 MTP（--spec 4・受理 61〜64%）",
-        "メモリ": "31,021 MiB 使用 / 1,166 MiB free",
-        "decode": "59.9〜76.7 T/s",
-        "prefill": "366,926 tok を 62.0 秒（5,916 T/s） / 45K: 3,359 T/s",
+        "ランチャー": "strataI2",
+        "対象": "Strata 9 モード（8080 を共有）。strataK4 / strataN4 は 2026-11-23 に重み削除済み＝機構のみ（一覧では [重み未導入]）。strataI2 = Inkling-2-Mini SQ-20（専用エンジン strata-inkling 0.1.66・.strata v1.1 SF4+MX8 無損失・DSpark 内蔵・26.4B-A3.4B looped MoE・5090 で 100% VRAM 常駐（実測 23.3GB）・ctx 262144（2026-11-23 に 32K→256K へ再設定・実測 56K prompt prefill 3,887 tok/s）・上限 1M・画像対応。重み Strata-data/models/inkling-2-mini/（SHA-256 検証済み）、導入 ./setup.sh --family inkling-2-mini --model SQ-20 --context 262144 --yes）",
+        "実体": "llm/Strata",
+        "重み": "SQ-20 19.35 GB + Vision 0.64 GB",
+        "decode": "decode 80.9 T/s",
+        "prefill": "prefill 1,989 T/s",
         "Port": "8080"
       },
-      "rank": 9
+      "rank": 4
     },
     {
       "id": "atom2:strata",
@@ -487,8 +256,8 @@
       "engineVersion": "0.2.11",
       "engineText": "Strata 0.2.11 / engine 0.1.57 HIP（rx9070 パッケージ = gfx1200/1201。R9700 は maintainer-tested で 0.2.9 以降のリリーステストに本機同構成（Linux x86 1×R9700 + Qwen IQ3_S）が含まれる。イメージ ghcr.io/niko1221/strata:0.2.11-rocm-gfx120x にピン）",
       "speculative": "int8（既定。KV も GPU に寄せる tuning 済み）",
-      "measuredAt": "2026-11-11",
-      "note": "",
+      "measuredAt": "2026-11-07",
+      "note": "0.2.11 の A/B 対測（0.2.9 比 decode +32.5%・prefill +723%）。DFlash2 で 1 リクエスト同時",
       "port": "8009",
       "os": "Ubuntu 26.04",
       "cpu": "Intel Core i9-12900KF",
@@ -496,7 +265,7 @@
       "gpu": "AMD Radeon AI PRO R9700 32GB（gfx1201 / RDNA4）",
       "sourceUrl": null,
       "raw": {
-        "切替コマンド": "./strata.sh",
+        "切替コマンド": "strata",
         "サービス": "strata",
         "モデル": "Qwen3.8-Flash-Next（MoE 512experts/10活性。Flash-Next は 27B dense とは別モデル。Strata は dense 非対応のため既存 GGUF は流用不可）",
         "量子化": "ISTA-DASLab IQ3_XXS（ファイル 75.8GB + pack 42GB + DFlash2 drafter。Strata 自動 DL）",
@@ -506,52 +275,7 @@
         "APIポート": "8009",
         "実行状況": "✅ 起動可（decode 75.92 T/s・prefill 1,372.14 T/s（2026-11-07 A/B 同一セッション対測。warm 状態の 0.2.9（57.29 / 166.68 T/s）に対し decode +32.5%・prefill +723%・TTFT 1.22→0.57s — 0.2.10 で DFlash2 が既定 drafter 化＋0.2.11 の Radeon prompt 改善。本機 prefill は従来 expert の SSD ストリームで律速（82〜198 T/s）だったが、その上限が消えた）。VRAM 31.8/31.9GiB 满载・RAM 23GiB。NIAH 120K PASS（63.4s）・check-services 3項目・tool call 正常。DFlash2 により 1 リクエスト同時に固定（本機の単一運用方針とは整合）。/v1/* は Bearer 認証必須）"
       },
-      "rank": 10
-    },
-    {
-      "id": "wb2026:strataU4",
-      "machineKey": "wb2026",
-      "machine": "Whitebear2026",
-      "launcher": "strataU4",
-      "model": "unsloth UD-IQ4_XS",
-      "modelId": "unsloth/Qwen3.8-Flash-Next-GGUF",
-      "weights": "~4bit・gate/up IQ3_S+IQ4_XS／down IQ4_NL+Q8_0・PLE 表 IQ4_NL",
-      "weightSize": 94,
-      "decode": 68.8,
-      "decodeText": "62.6〜68.8 T/s（0.1.43） / 0.1.40.3: 36.3（10-08・旧環境）",
-      "prefill": 2603,
-      "prefillText": "45,072 tok を 17.3 秒（2,603 T/s） / 183,493 tok を 51.4 秒（3,567 T/s）",
-      "context": 262144,
-      "contextText": "262,144 / int8",
-      "memoryKind": "VRAM",
-      "memoryNote": "アイドル時の VRAM 実測（32GB 中）。Strata 系は RAM に Expert を page-lock する",
-      "memory": 32.54,
-      "memoryText": "31,030 MiB 使用 / 1,157 MiB free",
-      "engine": "Strata",
-      "engineVersion": "0.1.49.2",
-      "engineText": "Strata 0.1.49.2（本機ビルド / sm_120・src b9993e25b7e78735・2026-10-25 に v0.2.4.2 ソースから更新（0.1.46.2→0.1.49.2）。strataQ3 以外は 0.1.43 時点の数値）",
-      "speculative": "内蔵 MTP（--spec 4・受理 61〜64%）",
-      "measuredAt": "2026-10-12",
-      "note": "",
-      "port": "8080",
-      "os": "WSL2 Ubuntu 26.04（Windows ホスト）",
-      "cpu": "Intel Core Ultra 7 270K Plus",
-      "ram": "86GB（WSL 割当）",
-      "gpu": "NVIDIA RTX 5090 32GB（sm_120・CUDA 13.1 / ドライバ 615.71）",
-      "sourceUrl": null,
-      "raw": {
-        "ランチャー": "strataU4",
-        "推論エンジン": "同上",
-        "モデル": "unsloth UD-IQ4_XS（~4bit・gate/up IQ3_S+IQ4_XS／down IQ4_NL+Q8_0・PLE 表 IQ4_NL）",
-        "重み": "94GB（Expert 38.00 GiB＝budget 38・VRAM cache 7,433 experts・no file reads）",
-        "コンテキスト / KV": "262,144 / int8",
-        "投機デコード": "内蔵 MTP（--spec 4・受理 61〜64%）",
-        "メモリ": "31,030 MiB 使用 / 1,157 MiB free",
-        "decode": "62.6〜68.8 T/s（0.1.43） / 0.1.40.3: 36.3（10-08・旧環境）",
-        "prefill": "45,072 tok を 17.3 秒（2,603 T/s） / 183,493 tok を 51.4 秒（3,567 T/s）",
-        "Port": "8080"
-      },
-      "rank": 11
+      "rank": 5
     },
     {
       "id": "atom1:nemo",
@@ -596,7 +320,7 @@
         "prefill": "2,285.0 T/s",
         "Port": "8000"
       },
-      "rank": 12
+      "rank": 6
     },
     {
       "id": "atom1:glm53flash",
@@ -641,52 +365,7 @@
         "prefill": "645.6 T/s",
         "Port": "8013"
       },
-      "rank": 13
-    },
-    {
-      "id": "wb2026:strataS4",
-      "machineKey": "wb2026",
-      "machine": "Whitebear2026",
-      "launcher": "strataS4",
-      "model": "nitinpanj Swift 1.5 Q4_0-Q8out v3",
-      "modelId": "nitinpanj/Swift-Qwen3.8-Flash-Next-Q4_0-Q8out-v3-GGUF",
-      "weights": "~4bit・plain Q4_0／down Q4_0+Q4_1・PLE 表 Q4_0",
-      "weightSize": 96,
-      "decode": 61.1,
-      "decodeText": "61.0〜61.1 T/s（0.1.43） / 0.1.40.3: 57.2 / 52.1",
-      "prefill": 2209,
-      "prefillText": "45,072 tok を 20.4 秒（2,209 T/s） / 183,493 tok を 67.8 秒（2,708 T/s）",
-      "context": 262144,
-      "contextText": "262,144 / int8",
-      "memoryKind": "VRAM",
-      "memoryNote": "アイドル時の VRAM 実測（32GB 中）。Strata 系は RAM に Expert を page-lock する",
-      "memory": 32.61,
-      "memoryText": "31,104 MiB 使用 / 1,083 MiB free",
-      "engine": "Strata",
-      "engineVersion": "0.1.49.2",
-      "engineText": "Strata 0.1.49.2（本機ビルド / sm_120・src b9993e25b7e78735・2026-10-25 に v0.2.4.2 ソースから更新（0.1.46.2→0.1.49.2）。strataQ3 以外は 0.1.43 時点の数値）",
-      "speculative": "内蔵 MTP（--spec 4・受理 61〜64%）",
-      "measuredAt": "2026-10-12",
-      "note": "",
-      "port": "8080",
-      "os": "WSL2 Ubuntu 26.04（Windows ホスト）",
-      "cpu": "Intel Core Ultra 7 270K Plus",
-      "ram": "86GB（WSL 割当）",
-      "gpu": "NVIDIA RTX 5090 32GB（sm_120・CUDA 13.1 / ドライバ 615.71）",
-      "sourceUrl": null,
-      "raw": {
-        "ランチャー": "strataS4",
-        "推論エンジン": "同上",
-        "モデル": "nitinpanj Swift 1.5 Q4_0-Q8out v3（~4bit・plain Q4_0／down Q4_0+Q4_1・PLE 表 Q4_0）",
-        "重み": "96GB（Expert 46.99 GiB を RAM ロック＝budget 47・VRAM cache 6,411 experts・no file reads）",
-        "コンテキスト / KV": "262,144 / int8",
-        "投機デコード": "内蔵 MTP（--spec 4・受理 61〜64%）",
-        "メモリ": "31,104 MiB 使用 / 1,083 MiB free",
-        "decode": "61.0〜61.1 T/s（0.1.43） / 0.1.40.3: 57.2 / 52.1",
-        "prefill": "45,072 tok を 20.4 秒（2,209 T/s） / 183,493 tok を 67.8 秒（2,708 T/s）",
-        "Port": "8080"
-      },
-      "rank": 14
+      "rank": 7
     },
     {
       "id": "atom1:qwen3codernext_exl3",
@@ -731,52 +410,7 @@
         "prefill": "2,087.0 T/s",
         "Port": "8020"
       },
-      "rank": 15
-    },
-    {
-      "id": "wb2026:llmjp",
-      "machineKey": "wb2026",
-      "machine": "Whitebear2026",
-      "launcher": "llmjp",
-      "model": "llm-jp-4.1-33b-thinking Q4_K_M",
-      "modelId": "llm-jp/llm-jp-4.1-33b-thinking",
-      "weights": "Apache-2.0・非gated",
-      "weightSize": 20.4,
-      "decode": 59,
-      "decodeText": "42〜59 T/s",
-      "prefill": 2142,
-      "prefillText": "2,142 T/s（41,407 tok 投入）",
-      "context": 49152,
-      "contextText": "49,152 / q8_0（.env で 65,536 / 32,768 に切替可）",
-      "memoryKind": "VRAM",
-      "memoryNote": "アイドル時の VRAM 実測（32GB 中）。Strata 系は RAM に Expert を page-lock する",
-      "memory": 30.43,
-      "memoryText": "29,020 / 32,607 MiB（空き 3.6GB）",
-      "engine": "llama.cpp",
-      "engineVersion": "b11609",
-      "engineText": "llama.cpp b11609（upstream v0.6.0 系 / CUDA 13.4・WSL ネイティブ）",
-      "speculative": "なし",
-      "measuredAt": "",
-      "note": "",
-      "port": "8060",
-      "os": "WSL2 Ubuntu 26.04（Windows ホスト）",
-      "cpu": "Intel Core Ultra 7 270K Plus",
-      "ram": "86GB（WSL 割当）",
-      "gpu": "NVIDIA RTX 5090 32GB（sm_120・CUDA 13.1 / ドライバ 615.71）",
-      "sourceUrl": null,
-      "raw": {
-        "ランチャー": "llmjp",
-        "推論エンジン": "llama.cpp b11609（upstream v0.6.0 系 / CUDA 13.4・WSL ネイティブ）",
-        "モデル": "llm-jp-4.1-33b-thinking Q4_K_M（Apache-2.0・非gated）",
-        "重み": "20.4GB",
-        "コンテキスト / KV": "49,152 / q8_0（.env で 65,536 / 32,768 に切替可）",
-        "投機デコード": "なし",
-        "メモリ": "29,020 / 32,607 MiB（空き 3.6GB）",
-        "decode": "42〜59 T/s",
-        "prefill": "2,142 T/s（41,407 tok 投入）",
-        "Port": "8060"
-      },
-      "rank": 16
+      "rank": 8
     },
     {
       "id": "atom2:gptoss",
@@ -801,8 +435,8 @@
       "engineVersion": "1.0.397",
       "engineText": "vLLM-Radiance 1.0.397（RDNA4 MXFP4カーネル）",
       "speculative": "—",
-      "measuredAt": "2026-11-11",
-      "note": "",
+      "measuredAt": "2026-11-01",
+      "note": "1.0.397。1.0.425 は decode +45% だが specials 混入で見送り",
       "port": "8008",
       "os": "Ubuntu 26.04",
       "cpu": "Intel Core i9-12900KF",
@@ -810,7 +444,7 @@
       "gpu": "AMD Radeon AI PRO R9700 32GB（gfx1201 / RDNA4）",
       "sourceUrl": null,
       "raw": {
-        "切替コマンド": "./gptoss.sh",
+        "切替コマンド": "gptoss",
         "サービス": "gptoss_20b_mxfp4",
         "モデル": "GPT-OSS-20B（MoE 36B総/5.1B active）",
         "量子化": "ネイティブMXFP4（openai公式）",
@@ -818,9 +452,9 @@
         "最大コンテキスト": "131,072",
         "KVキャッシュ": "FP8 E4M3（必須）",
         "APIポート": "8008",
-        "実行状況": "✅ 起動可（decode 58.99 T/s・prefill 3,083.26 T/s・受理率 28.4%／GPU KV 864,837 tok。2026-11-01 に 1.0.397 へ（同一イメージのため波及）check-services 3項目通過。2026-10-17 の 1.0.394 記録は decode 55.04 / prefill 2,832.74・117K NIAH PASS）"
+        "実行状況": "✅ 起動可（decode 58.99 T/s・prefill 3,083.26 T/s・受理率 28.4%／GPU KV 864,837 tok。2026-11-01 に 1.0.397 へ（同一イメージのため波及）check-services 3項目通過。2026-10-17 の 1.0.394 記録は decode 55.04 / prefill 2,832.74・117K NIAH PASS。2026-11-24 に 1.0.425 を対測：decode +45%・prefill +25% と大幅改善したが、max_tokens=32 で打ち切ると content に specials（<\\"
       },
-      "rank": 17
+      "rank": 9
     },
     {
       "id": "atom1:qwen38flashnextexl3",
@@ -865,7 +499,49 @@
         "prefill": "1,119.2 T/s",
         "Port": "8009"
       },
-      "rank": 18
+      "rank": 10
+    },
+    {
+      "id": "wb2026:strataK4",
+      "machineKey": "wb2026",
+      "machine": "Whitebear2026",
+      "launcher": "strataK4",
+      "model": null,
+      "modelId": null,
+      "weights": "unsloth UD-Q4_K_XL（rev 38bb39ee）",
+      "weightSize": 111.34,
+      "decode": 55.35,
+      "decodeText": "55.35 T/s",
+      "prefill": 1762,
+      "prefillText": "1762 T/s（3.5K prompt）",
+      "context": 262144,
+      "contextText": "ctx 262144",
+      "memoryKind": "VRAM",
+      "memoryNote": "アイドル時の VRAM 実測（32GB 中）。maya は RAM への pinned 値、clef は clef/README.md の実測、Strata 系は本文に測定値の記載なし",
+      "memory": null,
+      "memoryText": "—",
+      "engine": "Strata",
+      "engineVersion": "",
+      "engineText": "Strata 9 モード（8080 を共有）。strataK4 / strataN4 は 2026-11-23 に重み削除済み＝機構のみ（一覧では [重み未導入]）。strataI2 = Inkling-2-Mini SQ-20（専用エンジン strata-inkling 0.1.66・.strata v1.1 SF4+MX8 無損失・DSpark 内蔵・26.4B-A3.4B looped MoE・5090 で 100% VRAM 常駐（実測 23.3GB）・ctx 262144（2026-11-23 に 32K→256K へ再設定・実測 56K prompt prefill 3,887 tok/s）・上限 1M・画像対応。重み Strata-data/models/inkling-2-mini/（SHA-256 検証済み）、導入 ./setup.sh --family inkling-2-mini --model SQ-20 --context 262144 --yes）",
+      "speculative": "—",
+      "measuredAt": "2026-11-23",
+      "note": "2026-11-23 に重み削除済み（一覧は機構のみ＝[重み未導入]）。cold prefill の 1.24〜1.44× は同一量子化でのスイッチ ON/OFF 比で、IQ3_S は超えない",
+      "port": "8080",
+      "os": "WSL2 Ubuntu 26.04（Windows ホスト）",
+      "cpu": "Intel Core Ultra 7 270K Plus",
+      "ram": "86GB（WSL 割当）",
+      "gpu": "NVIDIA RTX 5090 32GB（sm_120・CUDA 13.1 / ドライバ 615.71）",
+      "sourceUrl": null,
+      "raw": {
+        "ランチャー": "strataK4",
+        "対象": "Strata 9 モード（8080 を共有）。strataK4 / strataN4 は 2026-11-23 に重み削除済み＝機構のみ（一覧では [重み未導入]）。strataI2 = Inkling-2-Mini SQ-20（専用エンジン strata-inkling 0.1.66・.strata v1.1 SF4+MX8 無損失・DSpark 内蔵・26.4B-A3.4B looped MoE・5090 で 100% VRAM 常駐（実測 23.3GB）・ctx 262144（2026-11-23 に 32K→256K へ再設定・実測 56K prompt prefill 3,887 tok/s）・上限 1M・画像対応。重み Strata-data/models/inkling-2-mini/（SHA-256 検証済み）、導入 ./setup.sh --family inkling-2-mini --model SQ-20 --context 262144 --yes）",
+        "実体": "llm/Strata",
+        "重み": "unsloth UD-Q4_K_XL（rev 38bb39ee）",
+        "decode": "55.35 T/s",
+        "prefill": "1762 T/s（3.5K prompt）",
+        "Port": "8080"
+      },
+      "rank": 11
     },
     {
       "id": "atom1:qwen3codernext_nvfp4",
@@ -910,7 +586,52 @@
         "prefill": "6,048.2 T/s",
         "Port": "8021"
       },
-      "rank": 19
+      "rank": 12
+    },
+    {
+      "id": "atom1:qwen38tfm4",
+      "machineKey": "atom1",
+      "machine": "AI TOP ATOM",
+      "launcher": "qwen38tfm4",
+      "model": "Qwen 3.8 27B",
+      "modelId": "TensorFold/Qwen3.8-27B-MLX-4bit",
+      "weights": "TensorFold/Qwen3.8-27B-MLX-4bit + z-lab/Qwen3.8-27B-DFlash2",
+      "weightSize": 53.16,
+      "decode": 51.75,
+      "decodeText": "51.75 T/s（1M・parallel 1。native 262,144 / parallel 8 は 45.99）",
+      "prefill": 1368.87,
+      "prefillText": "1,368.87 T/s",
+      "context": 1048576,
+      "contextText": "1,048,576（--rope-yarn 4・native 262,144）/ FP8 KV / --thinking-budget 4096",
+      "memoryKind": "統合メモリ",
+      "memoryNote": "起動後アイドル時の MemAvailable（ホスト 121.6GiB 中の空き）。値が大きいほど余裕がある＝消費が少ない",
+      "memory": 59,
+      "memoryText": "使用 62 GiB / MemAvailable 59 GB",
+      "engine": "TensorFold native 1.3.4（tensorfold-qwen38:v1.3.4、Zig 製・CUDA fatbin 同梱・Python 不要）",
+      "engineVersion": "1.3.4",
+      "engineText": "TensorFold native 1.3.4（tensorfold-qwen38:v1.3.4、Zig 製・CUDA fatbin 同梱・Python 不要）",
+      "speculative": "DFlash2（+ copies）",
+      "measuredAt": "2026-11-25",
+      "note": "decode 51.75 は 1M context・parallel 1。native 262,144 / parallel 8 は 45.99",
+      "port": "8032",
+      "os": "Ubuntu 24.04",
+      "cpu": "NVIDIA GB10",
+      "ram": "128GB（CPU/GPU 共有）",
+      "gpu": "GB10（sm_121・ドライバ 580.178.04）",
+      "sourceUrl": null,
+      "raw": {
+        "ランチャー": "qwen38tfm4",
+        "推論エンジン": "TensorFold native 1.3.4（tensorfold-qwen38:v1.3.4、Zig 製・CUDA fatbin 同梱・Python 不要）",
+        "モデル": "Qwen 3.8 27B（TensorFold/Qwen3.8-27B-MLX-4bit + z-lab/Qwen3.8-27B-DFlash2）",
+        "重み": "重み 16.05 GiB + KV 33.46 GiB（1 stream ＠1,048,576・fp8 cache・4 GiB reserve）",
+        "コンテキスト / KV": "1,048,576（--rope-yarn 4・native 262,144）/ FP8 KV / --thinking-budget 4096",
+        "投機デコード": "DFlash2（+ copies）",
+        "メモリ": "使用 62 GiB / MemAvailable 59 GB",
+        "decode": "51.75 T/s（1M・parallel 1。native 262,144 / parallel 8 は 45.99）",
+        "prefill": "1,368.87 T/s",
+        "Port": "8032"
+      },
+      "rank": 13
     },
     {
       "id": "atom2:qwen38gguf",
@@ -921,10 +642,10 @@
       "modelId": "unsloth/Qwen3.8-27B-GGUF",
       "weights": "GGUF UD-Q4_K_XL（unsloth）+ mmproj-F16",
       "weightSize": null,
-      "decode": 49.77,
-      "decodeText": "49.77 T/s",
-      "prefill": 924.21,
-      "prefillText": "924.21 T/s",
+      "decode": 49.12,
+      "decodeText": "49.12/50.23 T/s",
+      "prefill": 966.24,
+      "prefillText": "966.24/980.35 T/s",
       "context": 262144,
       "contextText": "262,144",
       "memoryKind": "VRAM",
@@ -932,11 +653,11 @@
       "memory": 31.05,
       "memoryText": "31.05GB（実測）",
       "engine": "llama.cpp",
-      "engineVersion": "b12180",
-      "engineText": "llama.cpp b12180 Vulkan + MTP（自建 Mesa 26.0.8・ggml v0.29.0）",
+      "engineVersion": "b12651",
+      "engineText": "llama.cpp b12651 Vulkan + MTP（自建 Mesa 26.0.8・v1.0.0-dev / ggml v1.0.0）",
       "speculative": "q8_0（draft は q4_0）+ -cram 12288",
-      "measuredAt": "2026-11-11",
-      "note": "",
+      "measuredAt": "2026-11-24",
+      "note": "b12651 は b12180 比 prefill +7.9%・250K NIAH −13.7%・decode/受理率同等。重みは旧 UD-Q4_K_XL 維持（上流の再量子化は利得なし）",
       "port": "8007",
       "os": "Ubuntu 26.04",
       "cpu": "Intel Core i9-12900KF",
@@ -944,17 +665,17 @@
       "gpu": "AMD Radeon AI PRO R9700 32GB（gfx1201 / RDNA4）",
       "sourceUrl": null,
       "raw": {
-        "切替コマンド": "./qwen38gguf.sh",
+        "切替コマンド": "qwen38gguf",
         "サービス": "qwen38_27b_gguf",
         "モデル": "Qwen 3.8 27B",
         "量子化": "GGUF UD-Q4_K_XL（unsloth）+ mmproj-F16",
-        "エンジン": "llama.cpp b12180 Vulkan + MTP（自建 Mesa 26.0.8・ggml v0.29.0）",
+        "エンジン": "llama.cpp b12651 Vulkan + MTP（自建 Mesa 26.0.8・v1.0.0-dev / ggml v1.0.0）",
         "最大コンテキスト": "262,144",
         "KVキャッシュ": "q8_0（draft は q4_0）+ -cram 12288",
         "APIポート": "8007",
-        "実行状況": "✅ 起動可（decode 49.77 T/s・prefill 924.21 T/s。MTP 受理率 48.5%（mean_len 3.02）。250K NIAH PASS（742.0s）。2026-11-07 に b11700→b12180 を同一セッション対測で採用（control 47.75 / 895.23・受理率 45.3%・NIAH 記録 833.6s に対し 全項目改善）。250K ピーク VRAM 31,052MB（b11700 実測 31,366MB より 314MB 余裕））"
+        "実行状況": "✅ 起動可（decode 49.12/50.23 T/s・prefill 966.24/980.35 T/s。MTP 受理率 48.7%（mean_len 2.84）。250K NIAH PASS（638.4s）。2026-11-24 に b12180→b12651 を同一セッション対測で採用（control b12180 は 50.33 / 908.14・受理率 48.4%・NIAH 739.8s＝prefill +7.9%・NIAH −13.7%・decode/受理率同等）。250K ピーク VRAM 31,324MB（b12180 は 11-07 実測 31,052MB・32,624MB 中）。重みは 旧 UD-Q4_K_XL 3f227079 を維持（上流の再量子化 2a5f3565 は対測で decode −4.4%・受理率 −3.9pt・OCR 27/33→24/33 と利得なし。2026-11-24 B 節））"
       },
-      "rank": 20
+      "rank": 14
     },
     {
       "id": "atom1:qwen38flashnextexl3_3p05",
@@ -999,7 +720,7 @@
         "prefill": "1,025.2 T/s",
         "Port": "8011"
       },
-      "rank": 21
+      "rank": 15
     },
     {
       "id": "atom1:qwen38flashnextexl3_sc3p68",
@@ -1044,7 +765,7 @@
         "prefill": "1,314.7 T/s",
         "Port": "8010"
       },
-      "rank": 22
+      "rank": 16
     },
     {
       "id": "atom1:qwen38flashnextexl3_4p05",
@@ -1089,7 +810,7 @@
         "prefill": "1,058.5 T/s",
         "Port": "8016"
       },
-      "rank": 23
+      "rank": 17
     },
     {
       "id": "atom1:qwen38flashnext_nvfp4",
@@ -1134,7 +855,7 @@
         "prefill": "2,851.7 T/s",
         "Port": "8015"
       },
-      "rank": 24
+      "rank": 18
     },
     {
       "id": "atom1:ornith122b",
@@ -1179,7 +900,7 @@
         "prefill": "1,254.7 T/s",
         "Port": "8018"
       },
-      "rank": 25
+      "rank": 19
     },
     {
       "id": "atom2:qwen38radiance",
@@ -1204,8 +925,8 @@
       "engineVersion": "1.0.397",
       "engineText": "vLLM-Radiance 1.0.397（vLLM 0.30.0・gfx1201専用カーネル）+ W4A8 / R4D GDN / MTP(3)",
       "speculative": "FP8 E4M3（必須）",
-      "measuredAt": "2026-11-11",
-      "note": "",
+      "measuredAt": "2026-11-01",
+      "note": "1.0.397 採用（1.0.425 は全項目退行で見送り）",
       "port": "8005",
       "os": "Ubuntu 26.04",
       "cpu": "Intel Core i9-12900KF",
@@ -1213,7 +934,7 @@
       "gpu": "AMD Radeon AI PRO R9700 32GB（gfx1201 / RDNA4）",
       "sourceUrl": null,
       "raw": {
-        "切替コマンド": "./qwen38radiance.sh",
+        "切替コマンド": "qwen38radiance",
         "サービス": "qwen38_27b_mxfp4",
         "モデル": "Qwen 3.8 27B",
         "量子化": "Quark MXFP4（amd公式）",
@@ -1221,9 +942,9 @@
         "最大コンテキスト": "220,160（262,144 は KV 不足）",
         "KVキャッシュ": "FP8 E4M3（必須）",
         "APIポート": "8005",
-        "実行状況": "✅ 起動可（decode 32.97 T/s・prefill 1,774.44 T/s・受理率 53.7%／GPU KV 221,627 tok。2026-11-01 に 1.0.394→1.0.397 を同一セッション対測で採用（1.0.394 側は 32.98 / 1,769.97 / 47.1%＝退行なし。1.0.397 の価値は速度でなく pillow/aiohttp の advisory 解消と Qwen ツール grammar 修正）。2026-10-17 の 1.0.394 記録は decode 52.99 T/s・受理率 77.4%・60K NIAH PASS（環境状態が異なるため直接比較不可）"
+        "実行状況": "✅ 起動可（decode 32.97 T/s・prefill 1,774.44 T/s・受理率 53.7%／GPU KV 221,627 tok。2026-11-01 に 1.0.394→1.0.397 を同一セッション対測で採用（1.0.394 側は 32.98 / 1,769.97 / 47.1%＝退行なし。1.0.397 の価値は速度でなく pillow/aiohttp の advisory 解消と Qwen ツール grammar 修正）。2026-10-17 の 1.0.394 記録は decode 52.99 T/s・受理率 77.4%・60K NIAH PASS（環境状態が異なるため直接比較不可）。2026-11-24 に 1.0.425 を同一セッション対測 → decode −4.0%・prefill −3.4〜−6.5%・受理率 −3.4pt・NIAH 60K 164.2→175.3s と全項目退行で見送り（詳細は 2026-11-24 radiance 節）"
       },
-      "rank": 26
+      "rank": 20
     },
     {
       "id": "atom1:qwen38flashnextgguf",
@@ -1268,7 +989,7 @@
         "prefill": "887.12 T/s",
         "Port": "8030"
       },
-      "rank": 27
+      "rank": 21
     },
     {
       "id": "atom2:magn",
@@ -1290,11 +1011,11 @@
       "memory": 23.1,
       "memoryText": "23.1GB（実測）",
       "engine": "Magnitude",
-      "engineVersion": "0.2.16-66",
-      "engineText": "Magnitude 0.2.16-66 Vulkan（Mesa 26.0.8・gfx1201 coopmat。ROCm 版は存在しない。公式 magnitude-release.json の version 0.2.16 / acnRevision 66 / rpc.version 14 と一致＝最新。0.2.10 以降は自動更新で入り、右の性能値は 0.2.9 時点の実測＝未対測）",
+      "engineVersion": "0.2.17-67",
+      "engineText": "Magnitude 0.2.17-67 Vulkan（Mesa 26.0.8・gfx1201 coopmat。ROCm 版は存在しない。公式 magnitude-release.json の version 0.2.17 / acnRevision 67 / rpc.version 15 と一致＝最新。0.2.10 以降は自動更新で入り、右の性能値は 0.2.9 時点の実測＝未対測）",
       "speculative": "—",
-      "measuredAt": "2026-11-11",
-      "note": "",
+      "measuredAt": "2026-10-17",
+      "note": "速度値は 0.2.9 時点の実測（現用 0.2.17-67 は未対測）。Vision 不可",
       "port": "10100",
       "os": "Ubuntu 26.04",
       "cpu": "Intel Core i9-12900KF",
@@ -1302,17 +1023,17 @@
       "gpu": "AMD Radeon AI PRO R9700 32GB（gfx1201 / RDNA4）",
       "sourceUrl": null,
       "raw": {
-        "切替コマンド": "./magn.sh",
+        "切替コマンド": "magn",
         "サービス": "magn（systemd user unit magn-headless）",
         "モデル": "Qwen 3.8 27B",
         "量子化": "GGUF UD-Q4_K_XL（20.5GB） + mmproj-BF16 0.93GB + 公式 DFlash2-Q8_0 2.06GB",
-        "エンジン": "Magnitude 0.2.16-66 Vulkan（Mesa 26.0.8・gfx1201 coopmat。ROCm 版は存在しない。公式 magnitude-release.json の version 0.2.16 / acnRevision 66 / rpc.version 14 と一致＝最新。0.2.10 以降は自動更新で入り、右の性能値は 0.2.9 時点の実測＝未対測）",
+        "エンジン": "Magnitude 0.2.17-67 Vulkan（Mesa 26.0.8・gfx1201 coopmat。ROCm 版は存在しない。公式 magnitude-release.json の version 0.2.17 / acnRevision 67 / rpc.version 15 と一致＝最新。0.2.10 以降は自動更新で入り、右の性能値は 0.2.9 時点の実測＝未対測）",
         "最大コンテキスト": "64K（softCapMaxTokens 65536）",
         "KVキャッシュ": "engine 内蔵（DFlash2）",
         "APIポート": "10100",
-        "実行状況": "✅ 起動可（decode 30.52/28.87 T/s・prefill 573.88/570.70 T/s。実 VRAM 23.1GB・空き 9.5GB。60K NIAH PASS。2026-10-17 に 0.2.7→0.2.9 で速度 -3〜-6% と引き換えに VRAM -1.3GB。Vision は不可）"
+        "実行状況": "✅ 起動可（decode 30.52/28.87 T/s・prefill 573.88/570.70 T/s。実 VRAM 23.1GB・空き 9.5GB。60K NIAH PASS。2026-10-17 に 0.2.7→0.2.9 で速度 -3〜-6% と引き換えに VRAM -1.3GB。Vision は不可）。catalog は上流が新重み（4af51b3／UD-Q4_K_XL 17.7GB）へ追随済みだが pull しない（新重みは本機で利得なし。2026-11-24 B 節）"
       },
-      "rank": 28
+      "rank": 22
     },
     {
       "id": "atom1:qwen38sglangdspark",
@@ -1357,7 +1078,7 @@
         "prefill": "2,083.6 T/s",
         "Port": "8008"
       },
-      "rank": 29
+      "rank": 23
     },
     {
       "id": "atom1:qwen38sglangdflash",
@@ -1402,7 +1123,7 @@
         "prefill": "1,800.4 T/s",
         "Port": "8008"
       },
-      "rank": 30
+      "rank": 24
     },
     {
       "id": "atom1:qwen38ggufq4",
@@ -1447,7 +1168,7 @@
         "prefill": "753.43 T/s",
         "Port": "8029"
       },
-      "rank": 31
+      "rank": 25
     },
     {
       "id": "atom1:qwen38flashnextggufq4",
@@ -1492,7 +1213,136 @@
         "prefill": "926.28 T/s",
         "Port": "8031"
       },
-      "rank": 32
+      "rank": 26
+    },
+    {
+      "id": "wb2026:maya",
+      "machineKey": "wb2026",
+      "machine": "Whitebear2026",
+      "launcher": "maya",
+      "model": "Project Maya",
+      "modelId": null,
+      "weights": "GLM-5.3-Flash · Maya-XS 321B MoE / ctx 262144 / OpenAI + Anthropic 互換",
+      "weightSize": null,
+      "decode": 26.2,
+      "decodeText": "decode 26.2 tok/s",
+      "prefill": null,
+      "prefillText": "—",
+      "context": 262144,
+      "contextText": "ctx 262144 ",
+      "memoryKind": "VRAM",
+      "memoryNote": "アイドル時の VRAM 実測（32GB 中）。maya は RAM への pinned 値、clef は clef/README.md の実測、Strata 系は本文に測定値の記載なし",
+      "memory": 47.6,
+      "memoryText": "47.6GB（実測）",
+      "engine": "Project Maya",
+      "engineVersion": "",
+      "engineText": "Project Maya（GLM-5.3-Flash · Maya-XS 321B MoE / ctx 262144 / OpenAI + Anthropic 互換）公式は Not WSL2 だが実測 pinned 47.6GB / decode 26.2 tok/s（RAM 94GB）",
+      "speculative": "—",
+      "measuredAt": "",
+      "note": "公式は Not WSL2 だが実測稼働。RAM 94GB に対し pinned 47.6GB。README に測定日の記載なし",
+      "port": "8070",
+      "os": "WSL2 Ubuntu 26.04（Windows ホスト）",
+      "cpu": "Intel Core Ultra 7 270K Plus",
+      "ram": "86GB（WSL 割当）",
+      "gpu": "NVIDIA RTX 5090 32GB（sm_120・CUDA 13.1 / ドライバ 615.71）",
+      "sourceUrl": null,
+      "raw": {
+        "ランチャー": "maya",
+        "対象": "Project Maya（GLM-5.3-Flash · Maya-XS 321B MoE / ctx 262144 / OpenAI + Anthropic 互換）公式は Not WSL2 だが実測 pinned 47.6GB / decode 26.2 tok/s（RAM 94GB）",
+        "実体": "llm/maya",
+        "重み": "GLM-5.3-Flash · Maya-XS 321B MoE / ctx 262144 / OpenAI + Anthropic 互換",
+        "decode": "decode 26.2 tok/s",
+        "prefill": "—",
+        "Port": "8070"
+      },
+      "rank": 27
+    },
+    {
+      "id": "wb2026:strataN4",
+      "machineKey": "wb2026",
+      "machine": "Whitebear2026",
+      "launcher": "strataN4",
+      "model": null,
+      "modelId": null,
+      "weights": "Maximilian228/…NVFP4-GPTQ-Strata（rev 640a1db9）",
+      "weightSize": 128,
+      "decode": 25.99,
+      "decodeText": "25.99 T/s",
+      "prefill": 1438,
+      "prefillText": "1438 T/s（3.5K prompt）",
+      "context": 262144,
+      "contextText": "ctx 262144",
+      "memoryKind": "VRAM",
+      "memoryNote": "アイドル時の VRAM 実測（32GB 中）。maya は RAM への pinned 値、clef は clef/README.md の実測、Strata 系は本文に測定値の記載なし",
+      "memory": null,
+      "memoryText": "—",
+      "engine": "Strata",
+      "engineVersion": "",
+      "engineText": "Strata 9 モード（8080 を共有）。strataK4 / strataN4 は 2026-11-23 に重み削除済み＝機構のみ（一覧では [重み未導入]）。strataI2 = Inkling-2-Mini SQ-20（専用エンジン strata-inkling 0.1.66・.strata v1.1 SF4+MX8 無損失・DSpark 内蔵・26.4B-A3.4B looped MoE・5090 で 100% VRAM 常駐（実測 23.3GB）・ctx 262144（2026-11-23 に 32K→256K へ再設定・実測 56K prompt prefill 3,887 tok/s）・上限 1M・画像対応。重み Strata-data/models/inkling-2-mini/（SHA-256 検証済み）、導入 ./setup.sh --family inkling-2-mini --model SQ-20 --context 262144 --yes）",
+      "speculative": "—",
+      "measuredAt": "2026-11-23",
+      "note": "2026-11-23 に重み削除済み（[重み未導入]）。16K 以上で non-finite logits（#879）→ HTTP 503。PREFILL_NVFP4 を切ると IQ3_S より遅い",
+      "port": "8080",
+      "os": "WSL2 Ubuntu 26.04（Windows ホスト）",
+      "cpu": "Intel Core Ultra 7 270K Plus",
+      "ram": "86GB（WSL 割当）",
+      "gpu": "NVIDIA RTX 5090 32GB（sm_120・CUDA 13.1 / ドライバ 615.71）",
+      "sourceUrl": null,
+      "raw": {
+        "ランチャー": "strataN4",
+        "対象": "Strata 9 モード（8080 を共有）。strataK4 / strataN4 は 2026-11-23 に重み削除済み＝機構のみ（一覧では [重み未導入]）。strataI2 = Inkling-2-Mini SQ-20（専用エンジン strata-inkling 0.1.66・.strata v1.1 SF4+MX8 無損失・DSpark 内蔵・26.4B-A3.4B looped MoE・5090 で 100% VRAM 常駐（実測 23.3GB）・ctx 262144（2026-11-23 に 32K→256K へ再設定・実測 56K prompt prefill 3,887 tok/s）・上限 1M・画像対応。重み Strata-data/models/inkling-2-mini/（SHA-256 検証済み）、導入 ./setup.sh --family inkling-2-mini --model SQ-20 --context 262144 --yes）",
+        "実体": "llm/Strata",
+        "重み": "Maximilian228/…NVFP4-GPTQ-Strata（rev 640a1db9）",
+        "decode": "25.99 T/s",
+        "prefill": "1438 T/s（3.5K prompt）",
+        "Port": "8080"
+      },
+      "rank": 28
+    },
+    {
+      "id": "atom1:qwen38tfm8",
+      "machineKey": "atom1",
+      "machine": "AI TOP ATOM",
+      "launcher": "qwen38tfm8",
+      "model": "Qwen 3.8 27B",
+      "modelId": "TensorFold/Qwen3.8-27B-MLX-8bit",
+      "weights": "TensorFold/Qwen3.8-27B-MLX-8bit + 同じ z-lab/Qwen3.8-27B-DFlash2",
+      "weightSize": 66.63,
+      "decode": 25.84,
+      "decodeText": "25.84 T/s（4bit の 0.50 倍・TTFT 0.17 s）",
+      "prefill": 845.47,
+      "prefillText": "845.47 T/s（TTFT 12.83 s／10,846 tok）",
+      "context": 1048576,
+      "contextText": "1,048,576（--rope-yarn 4・native 262,144）/ FP8 KV / --thinking-budget 4096",
+      "memoryKind": "統合メモリ",
+      "memoryNote": "起動後アイドル時の MemAvailable（ホスト 121.6GiB 中の空き）。値が大きいほど余裕がある＝消費が少ない",
+      "memory": 46,
+      "memoryText": "使用 75 GiB / MemAvailable 46 GB",
+      "engine": "TensorFold native 1.3.4（tensorfold-qwen38:v1.3.4、Zig 製・CUDA fatbin 同梱・Python 不要）",
+      "engineVersion": "1.3.4",
+      "engineText": "TensorFold native 1.3.4（tensorfold-qwen38:v1.3.4、Zig 製・CUDA fatbin 同梱・Python 不要）",
+      "speculative": "DFlash2（+ copies）",
+      "measuredAt": "2026-11-25",
+      "note": "4bit の 0.50 倍（TTFT 0.17s）。prefill は 10,846 tok・TTFT 12.83s",
+      "port": "8034",
+      "os": "Ubuntu 24.04",
+      "cpu": "NVIDIA GB10",
+      "ram": "128GB（CPU/GPU 共有）",
+      "gpu": "GB10（sm_121・ドライバ 580.178.04）",
+      "sourceUrl": null,
+      "raw": {
+        "ランチャー": "qwen38tfm8",
+        "推論エンジン": "同上（同一イメージ・同一 serve.sh。TF_MODEL を 8bit にしただけ）",
+        "モデル": "Qwen 3.8 27B（TensorFold/Qwen3.8-27B-MLX-8bit + 同じ z-lab/Qwen3.8-27B-DFlash2）",
+        "重み": "重み 28.59 GiB + KV 33.46 GiB（同一。device 実測の残 budget 75.8 GiB）",
+        "コンテキスト / KV": "同上（--rope-yarn 4 / FP8 KV / budget 4096）",
+        "投機デコード": "DFlash2（+ copies）",
+        "メモリ": "使用 75 GiB / MemAvailable 46 GB",
+        "decode": "25.84 T/s（4bit の 0.50 倍・TTFT 0.17 s）",
+        "prefill": "845.47 T/s（TTFT 12.83 s／10,846 tok）",
+        "Port": "8034"
+      },
+      "rank": 29
     },
     {
       "id": "atom1:Muse",
@@ -1537,7 +1387,7 @@
         "prefill": "819.8 T/s",
         "Port": "8004"
       },
-      "rank": 33
+      "rank": 30
     },
     {
       "id": "atom1:qwen38sglangeagle",
@@ -1582,7 +1432,7 @@
         "prefill": "2,245.7 T/s",
         "Port": "8008"
       },
-      "rank": 34
+      "rank": 31
     },
     {
       "id": "atom1:qwen38gguf",
@@ -1627,7 +1477,7 @@
         "prefill": "607.34 T/s",
         "Port": "8028"
       },
-      "rank": 35
+      "rank": 32
     },
     {
       "id": "atom1:qwen38nvfp4",
@@ -1672,7 +1522,7 @@
         "prefill": "1,508.6 T/s",
         "Port": "8007"
       },
-      "rank": 36
+      "rank": 33
     },
     {
       "id": "atom1:qwen38",
@@ -1717,52 +1567,7 @@
         "prefill": "952.67 T/s",
         "Port": "8005"
       },
-      "rank": 37
-    },
-    {
-      "id": "wb2026:strataD4",
-      "machineKey": "wb2026",
-      "machine": "Whitebear2026",
-      "launcher": "strataD4",
-      "model": "ISTA-DASLab DeepSeek-V4.1-Flash-1017 IQ1_M 1.75bpw",
-      "modelId": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017",
-      "weights": "40層・384 experts MoE + Engram n-gram 111GB + DSpark drafter 8GB・2026-10-27 追加",
-      "weightSize": 224,
-      "decode": 15.4,
-      "decodeText": "8.5〜10.4 T/s（2026-10-27・0.1.51 短回答実測）→ 12.4〜15.4 T/s（2026-10-28・0.1.52 A/B）",
-      "prefill": 550.2,
-      "prefillText": "17.1 T/s（23 tok・0.1.51）→ cold 7,213 tok で 85.4 → 550.2 T/s（TTFT 84.4 → 13.1 s）（0.1.52）",
-      "context": 8192,
-      "contextText": "8,192（検証済みサイズ。公式に KV streaming 該当なし）",
-      "memoryKind": "VRAM",
-      "memoryNote": "アイドル時の VRAM 実測（32GB 中）。Strata 系は RAM に Expert を page-lock する",
-      "memory": 28,
-      "memoryText": "experts 3,826 件（約 28GB 相当）を VRAM",
-      "engine": "Strata",
-      "engineVersion": "0.1.52",
-      "engineText": "Strata サーバー + 専用エンジン strata-dsv41 0.1.52（署名済みフィード / CUDA 13・2026-10-28 に v0.2.7 で更新。A/B 用に 0.1.51 も engine-dsv41/ へ残置）",
-      "speculative": "DSpark（auto・--dspark-conf 0.65）",
-      "measuredAt": "2026-10-30",
-      "note": "",
-      "port": "8080",
-      "os": "WSL2 Ubuntu 26.04（Windows ホスト）",
-      "cpu": "Intel Core Ultra 7 270K Plus",
-      "ram": "86GB（WSL 割当）",
-      "gpu": "NVIDIA RTX 5090 32GB（sm_120・CUDA 13.1 / ドライバ 615.71）",
-      "sourceUrl": null,
-      "raw": {
-        "ランチャー": "strataD4",
-        "推論エンジン": "Strata サーバー + 専用エンジン strata-dsv41 0.1.52（署名済みフィード / CUDA 13・2026-10-28 に v0.2.7 で更新。A/B 用に 0.1.51 も engine-dsv41/ へ残置）",
-        "モデル": "ISTA-DASLab DeepSeek-V4.1-Flash-1017 IQ1_M 1.75bpw（40層・384 experts MoE + Engram n-gram 111GB + DSpark drafter 8GB・2026-10-27 追加）",
-        "重み": "224GB（IQ1_M シャード 121 + Engram 111 + drafter 8。2026-10-27 に削除＝速度が実用に耐えず採用見送り）",
-        "コンテキスト / KV": "8,192（検証済みサイズ。公式に KV streaming 該当なし）",
-        "投機デコード": "DSpark（auto・--dspark-conf 0.65）",
-        "メモリ": "experts 3,826 件（約 28GB 相当）を VRAM",
-        "decode": "8.5〜10.4 T/s（2026-10-27・0.1.51 短回答実測）→ 12.4〜15.4 T/s（2026-10-28・0.1.52 A/B）",
-        "prefill": "17.1 T/s（23 tok・0.1.51）→ cold 7,213 tok で 85.4 → 550.2 T/s（TTFT 84.4 → 13.1 s）（0.1.52）",
-        "Port": "8080"
-      },
-      "rank": 38
+      "rank": 34
     },
     {
       "id": "atom1:qwen38swift_dflash",
@@ -1807,7 +1612,7 @@
         "prefill": "1,254.4 T/s",
         "Port": "8012"
       },
-      "rank": 39
+      "rank": 35
     },
     {
       "id": "atom1:mimo9b",
@@ -1852,7 +1657,7 @@
         "prefill": "3,806.6 T/s†",
         "Port": "8014"
       },
-      "rank": 40
+      "rank": 36
     },
     {
       "id": "atom1:qwen38sglang",
@@ -1897,7 +1702,7 @@
         "prefill": "2,355.7 T/s",
         "Port": "8008"
       },
-      "rank": 41
+      "rank": 37
     },
     {
       "id": "atom1:qwen38bf16",
@@ -1942,7 +1747,7 @@
         "prefill": "1,316.4 T/s†",
         "Port": "8006"
       },
-      "rank": 42
+      "rank": 38
     },
     {
       "id": "atom1:qwen38swift",
@@ -1987,7 +1792,7 @@
         "prefill": "1,278.6 T/s†",
         "Port": "8012"
       },
-      "rank": 43
+      "rank": 39
     },
     {
       "id": "atom1:nanbeige43",
@@ -2032,7 +1837,7 @@
         "prefill": "1,447.7 T/s",
         "Port": "8019"
       },
-      "rank": 44
+      "rank": 40
     },
     {
       "id": "atom1:glm53flash_mosaic",
@@ -2077,7 +1882,7 @@
         "prefill": "292.4 T/s",
         "Port": "8017"
       },
-      "rank": 45
+      "rank": 41
     },
     {
       "id": "atom1:ripplead",
@@ -2122,52 +1927,7 @@
         "prefill": "499.53 T/s",
         "Port": "8023"
       },
-      "rank": 46
-    },
-    {
-      "id": "wb2026:swiftqwen38",
-      "machineKey": "wb2026",
-      "machine": "Whitebear2026",
-      "launcher": "swiftqwen38",
-      "model": "ukisai/Swift-Qwen3.8-27B-NVFP4 + z-lab DFlash2 ドラフター",
-      "modelId": "ukisai/Swift-Qwen3.8-27B-NVFP4",
-      "weights": "21.9 + 3.6GB",
-      "weightSize": 25.5,
-      "decode": 7,
-      "decodeText": "長文 profile: 短文 ~7 T/s / 252K ~0.15 T/s / 速度 profile(24K): ~134 T/s",
-      "prefill": 1650,
-      "prefillText": "252K を ~154 秒（~1,650 T/s）",
-      "context": 262144,
-      "contextText": "262,144 / fp4_mx_block16（Triton）",
-      "memoryKind": "VRAM",
-      "memoryNote": "アイドル時の VRAM 実測（32GB 中）。Strata 系は RAM に Expert を page-lock する",
-      "memory": 26.09,
-      "memoryText": "target 19.7GiB + KV 4.6GiB（262K）",
-      "engine": "SGLang",
-      "engineVersion": "nightly-dev-cu13",
-      "engineText": "SGLang（Docker / nightly-dev-cu13）",
-      "speculative": "262K と両立不可（速度 profile のみ可）",
-      "measuredAt": "2026-09-23",
-      "note": "",
-      "port": "8040",
-      "os": "WSL2 Ubuntu 26.04（Windows ホスト）",
-      "cpu": "Intel Core Ultra 7 270K Plus",
-      "ram": "86GB（WSL 割当）",
-      "gpu": "NVIDIA RTX 5090 32GB（sm_120・CUDA 13.1 / ドライバ 615.71）",
-      "sourceUrl": null,
-      "raw": {
-        "ランチャー": "swiftqwen38",
-        "推論エンジン": "SGLang（Docker / nightly-dev-cu13）",
-        "モデル": "ukisai/Swift-Qwen3.8-27B-NVFP4 + z-lab DFlash2 ドラフター",
-        "重み": "21.9 + 3.6GB",
-        "コンテキスト / KV": "262,144 / fp4_mx_block16（Triton）",
-        "投機デコード": "262K と両立不可（速度 profile のみ可）",
-        "メモリ": "target 19.7GiB + KV 4.6GiB（262K）",
-        "decode": "長文 profile: 短文 ~7 T/s / 252K ~0.15 T/s / 速度 profile(24K): ~134 T/s",
-        "prefill": "252K を ~154 秒（~1,650 T/s）",
-        "Port": "8040"
-      },
-      "rank": 47
+      "rank": 42
     },
     {
       "id": "atom1:rippleexl3",
@@ -2212,7 +1972,7 @@
         "prefill": "349.71 T/s",
         "Port": "8026"
       },
-      "rank": 48
+      "rank": 43
     },
     {
       "id": "atom1:nanbeige43nospec",
@@ -2257,7 +2017,7 @@
         "prefill": "1,509.7 T/s",
         "Port": "8019"
       },
-      "rank": 49
+      "rank": 44
     },
     {
       "id": "atom1:ripplea",
@@ -2302,7 +2062,7 @@
         "prefill": "510.76 T/s",
         "Port": "8022"
       },
-      "rank": 50
+      "rank": 45
     },
     {
       "id": "atom2:clef",
@@ -2321,14 +2081,14 @@
       "contextText": "262,144（実効は -ub の 16,384 tok）",
       "memoryKind": "VRAM",
       "memoryNote": "ディスクリート GPU の実測 VRAM（32.6GB 中・sysfs サンプリング）",
-      "memory": 20.6,
-      "memoryText": "20.6GB（実測）",
+      "memory": 22.1,
+      "memoryText": "22.1GB（実測）",
       "engine": "llama.cpp",
-      "engineVersion": "b12180",
-      "engineText": "llama.cpp b12180 Vulkan（既存イメージ流用・再ビルド不要。/v1/systemone）",
+      "engineVersion": "b12651",
+      "engineText": "llama.cpp b12651 Vulkan（既存イメージ流用・再ビルド不要。/v1/systemone）",
       "speculative": "—",
-      "measuredAt": "2026-11-21",
-      "note": "判定専用（decision）モデル。生成しないため decode/prefill 該当なし（/v1/systemone のみ・chat は 501）。text 133〜288ms・画像 604ms・systemone 検証 6/6 通過",
+      "measuredAt": "2026-11-24",
+      "note": "判定専用（decision）モデル。生成しないため decode/prefill 該当なし（/v1/systemone のみ・chat は 501）。b12651 で text 122〜173ms・画像 392ms・VRAM 22.1GB。b12180 との突合は最大絶対差 0.0027",
       "port": "8014",
       "os": "Ubuntu 26.04",
       "cpu": "Intel Core i9-12900KF",
@@ -2336,17 +2096,59 @@
       "gpu": "AMD Radeon AI PRO R9700 32GB（gfx1201 / RDNA4）",
       "sourceUrl": null,
       "raw": {
-        "切替コマンド": "./clef.sh",
+        "切替コマンド": "clef",
         "サービス": "clef_flash",
         "モデル": "Clef-Flash 9B（decision モデル＝生成しない）。Cloudflare が Qwen3.5-9B を post-train + joint schema head 243MB。state（text/JSON/画像）× 型付き質問を 1 prefill で全 option 判定",
         "量子化": "ggml-org 公式 GGUF BF16 18.16GB + mmproj-BF16 0.92GB（head は GGUF 内蔵。architecture=clef / decision_type=clef）",
-        "エンジン": "llama.cpp b12180 Vulkan（既存イメージ流用・再ビルド不要。/v1/systemone）",
+        "エンジン": "llama.cpp b12651 Vulkan（既存イメージ流用・再ビルド不要。/v1/systemone）",
         "最大コンテキスト": "262,144（実効は -ub の 16,384 tok）",
         "KVキャッシュ": "q8_0（full attention は 32層中 8層のみ）",
         "APIポート": "8014",
-        "実行状況": "✅ 起動可（text 133〜288ms・画像 604ms／VRAM 20.6GB・ロード 5秒。systemone 検証 6ケース全通過：France 0.9836・sky 0.9822・grass 誤命題 false 0.9720・billing 0.9769・invoice JSON overdue 0.9730／large 0.9729・実物スキャンで invoice 0.9640。2026-11-21 追加）"
+        "実行状況": "✅ 起動可（text 122〜173ms・画像 392ms／VRAM 22.1GB・ロード 5秒。systemone 検証 6ケース全通過：France 0.9835・sky 0.9822・grass 誤命題 false 0.9721・billing 0.9769・invoice JSON overdue 0.9729／large 0.9729・実物スキャンで invoice 0.9640。2026-11-24 に b12651 へ更新し、b12180 基準（systemone_test.py --save）と --compare で突合→最大絶対差 0.0027（閾値 0.05）で数値は同一。2026-11-21 追加）"
       },
-      "rank": 51
+      "rank": 46
+    },
+    {
+      "id": "wb2026:clef",
+      "machineKey": "wb2026",
+      "machine": "Whitebear2026",
+      "launcher": "clef",
+      "model": "Clef-Flash BF16",
+      "modelId": "Cloudflare/clef-flash",
+      "weights": "decision モデル / llama.cpp b12180 CUDA",
+      "weightSize": null,
+      "decode": null,
+      "decodeText": "—",
+      "prefill": null,
+      "prefillText": "—",
+      "context": 16384,
+      "contextText": "実効入力 16,384 tok",
+      "memoryKind": "VRAM",
+      "memoryNote": "アイドル時の VRAM 実測（32GB 中）。maya は RAM への pinned 値、clef は clef/README.md の実測、Strata 系は本文に測定値の記載なし",
+      "memory": 23.9,
+      "memoryText": "23.9GB（実測・clef/README.md）",
+      "engine": "llama.cpp",
+      "engineVersion": "b12180",
+      "engineText": "Clef-Flash BF16（decision モデル / llama.cpp b12180 CUDA）・/v1/systemone 専用（chat は 501）・実効入力 16,384 tok・Atom2LLM 準拠・2026-11-23 から LAN 公開（HOST=0.0.0.0 / 無認証 / FW は LAN 限定）",
+      "speculative": "—",
+      "measuredAt": "2026-11-23",
+      "note": "判定専用（decision）モデル。生成しない（/v1/chat/completions は 501）。text 29〜411ms・画像 1.8s。atom2 版との A/B は最大絶対差 0.0009、長文 prefill は 9,120〜10,859 T/s（4.4〜5.5 倍）",
+      "port": "8092",
+      "os": "WSL2 Ubuntu 26.04（Windows ホスト）",
+      "cpu": "Intel Core Ultra 7 270K Plus",
+      "ram": "86GB（WSL 割当）",
+      "gpu": "NVIDIA RTX 5090 32GB（sm_120・CUDA 13.1 / ドライバ 615.71）",
+      "sourceUrl": null,
+      "raw": {
+        "ランチャー": "clef",
+        "対象": "Clef-Flash BF16（decision モデル / llama.cpp b12180 CUDA）・/v1/systemone 専用（chat は 501）・実効入力 16,384 tok・Atom2LLM 準拠・2026-11-23 から LAN 公開（HOST=0.0.0.0 / 無認証 / FW は LAN 限定）",
+        "実体": "llm/clef",
+        "重み": "decision モデル / llama.cpp b12180 CUDA",
+        "decode": "—",
+        "prefill": "—",
+        "Port": "8092"
+      },
+      "rank": 47
     },
     {
       "id": "atom2:qwen38sglangrocm",
@@ -2371,8 +2173,8 @@
       "engineVersion": "0.5.15",
       "engineText": "SGLang 0.5.15 ROCm（rocm/sgl-dev・AITER+triton）",
       "speculative": "—",
-      "measuredAt": "2026-11-11",
-      "note": "",
+      "measuredAt": "2026-10-06",
+      "note": "上流非対応で起動不可（2026-10-06 に再現確認）",
       "port": "8006",
       "os": "Ubuntu 26.04",
       "cpu": "Intel Core i9-12900KF",
@@ -2380,7 +2182,7 @@
       "gpu": "AMD Radeon AI PRO R9700 32GB（gfx1201 / RDNA4）",
       "sourceUrl": null,
       "raw": {
-        "切替コマンド": "./qwen38sglangrocm.sh",
+        "切替コマンド": "qwen38sglangrocm",
         "サービス": "qwen38_27b_sglang_rocm",
         "モデル": "Qwen 3.8 27B",
         "量子化": "Quark MXFP4（共有）",
@@ -2390,7 +2192,7 @@
         "APIポート": "8006",
         "実行状況": "❌ ロード失敗（起動不可）。AWQ は gptq_marlin_repack が ROCm ビルドに無し。MXFP4 は AITER の is_fp4_avail() が gfx950/gfx1250 限定で gfx1201 は MXFP4 is not available on your device。2026-10-06 に再現確認"
       },
-      "rank": 52
+      "rank": 48
     },
     {
       "id": "atom2:qwen3vl",
@@ -2416,7 +2218,7 @@
       "engineText": "vLLM-Radiance 1.0.425（vLLM 0.33.0・ROCm 10.0・Torch 2.13・digest 00d36f307d1f）",
       "speculative": "—",
       "measuredAt": "2026-11-11",
-      "note": "",
+      "note": "OCR/VL 専用ライン（生成ラインとは別枠）で速度未計測。実物 OCR 27/33",
       "port": "8013",
       "os": "Ubuntu 26.04",
       "cpu": "Intel Core i9-12900KF",
@@ -2424,7 +2226,7 @@
       "gpu": "AMD Radeon AI PRO R9700 32GB（gfx1201 / RDNA4）",
       "sourceUrl": null,
       "raw": {
-        "切替コマンド": "./qwen3vl.sh",
+        "切替コマンド": "qwen3vl",
         "サービス": "qwen3vl_8b_fp8",
         "モデル": "Qwen3-VL-8B-Instruct（OCR/VL 専用ライン）",
         "量子化": "FP8 E4M3 6.95GB + BF16 1.82GB = 10.59GB（Qwen/Qwen3-VL-8B-Instruct-FP8。apache-2.0・ungated）",
@@ -2434,97 +2236,7 @@
         "APIポート": "8013",
         "実行状況": "✅ 起動可（実物OCR 5項目 27/33=81.8%・登録番号の幻覚 0 件／1件 avg 1.74 秒・pt 425-1217（hipfire 比 30% 速く画像トークン約半）。モデルロード 1.93 秒・起動 2分40秒・VRAM 30.2GB。2026-11-11 追加。1.0.425 は上流で \"not production-qualified\"（認定 TP2・本機 TP1）なので既存 27B 系の 1.0.397 は据え置き）"
       },
-      "rank": 53
-    },
-    {
-      "id": "wb2026:qwen9",
-      "machineKey": "wb2026",
-      "machine": "Whitebear2026",
-      "launcher": "qwen9",
-      "model": "Qwen3.5-9B-EXL3 4.0bpw",
-      "modelId": "TheMelonGod/Qwen3.5-9B-exl3",
-      "weights": "TheMelonGod mul1",
-      "weightSize": null,
-      "decode": null,
-      "decodeText": "—",
-      "prefill": null,
-      "prefillText": "—",
-      "context": 131072,
-      "contextText": "131,072（max_seq_len）",
-      "memoryKind": "VRAM",
-      "memoryNote": "アイドル時の VRAM 実測（32GB 中）。Strata 系は RAM に Expert を page-lock する",
-      "memory": null,
-      "memoryText": "—",
-      "engine": "TabbyAPI + ExLlamaV3",
-      "engineVersion": "",
-      "engineText": "TabbyAPI + exllamav3",
-      "speculative": "設定参照",
-      "measuredAt": "",
-      "note": "",
-      "port": "5003",
-      "os": "WSL2 Ubuntu 26.04（Windows ホスト）",
-      "cpu": "Intel Core Ultra 7 270K Plus",
-      "ram": "86GB（WSL 割当）",
-      "gpu": "NVIDIA RTX 5090 32GB（sm_120・CUDA 13.1 / ドライバ 615.71）",
-      "sourceUrl": null,
-      "raw": {
-        "ランチャー": "qwen9",
-        "推論エンジン": "TabbyAPI + exllamav3",
-        "モデル": "Qwen3.5-9B-EXL3 4.0bpw（TheMelonGod mul1）",
-        "重み": "設定のみ（本機ベンチ未実施）",
-        "コンテキスト / KV": "131,072（max_seq_len）",
-        "投機デコード": "設定参照",
-        "メモリ": "—",
-        "decode": "—",
-        "prefill": "—",
-        "Port": "5003"
-      },
-      "rank": 54
-    },
-    {
-      "id": "wb2026:exl",
-      "machineKey": "wb2026",
-      "machine": "Whitebear2026",
-      "launcher": "exl",
-      "model": "Qwen3.8-27B-EXL3 3.5bpw + DFlash2 5.0bpw ドラフト",
-      "modelId": null,
-      "weights": "14.2 + 1.4GB",
-      "weightSize": 15.6,
-      "decode": null,
-      "decodeText": "本機実測なし（上流 DGX Spark 値のみ）",
-      "prefill": null,
-      "prefillText": "—",
-      "context": 262144,
-      "contextText": "262,144 / NVFP4",
-      "memoryKind": "VRAM",
-      "memoryNote": "アイドル時の VRAM 実測（32GB 中）。Strata 系は RAM に Expert を page-lock する",
-      "memory": 28,
-      "memoryText": "約 27〜28GB",
-      "engine": "ExLlamaV3",
-      "engineVersion": "1.4.2",
-      "engineText": "exllamav3 1.4.2（MiaAI-Lab fork）+ serve_openai.py",
-      "speculative": "DFlash2",
-      "measuredAt": "",
-      "note": "",
-      "port": "8888",
-      "os": "WSL2 Ubuntu 26.04（Windows ホスト）",
-      "cpu": "Intel Core Ultra 7 270K Plus",
-      "ram": "86GB（WSL 割当）",
-      "gpu": "NVIDIA RTX 5090 32GB（sm_120・CUDA 13.1 / ドライバ 615.71）",
-      "sourceUrl": null,
-      "raw": {
-        "ランチャー": "exl",
-        "推論エンジン": "exllamav3 1.4.2（MiaAI-Lab fork）+ serve_openai.py",
-        "モデル": "Qwen3.8-27B-EXL3 3.5bpw + DFlash2 5.0bpw ドラフト",
-        "重み": "14.2 + 1.4GB",
-        "コンテキスト / KV": "262,144 / NVFP4",
-        "投機デコード": "DFlash2",
-        "メモリ": "約 27〜28GB",
-        "decode": "本機実測なし（上流 DGX Spark 値のみ）",
-        "prefill": "—",
-        "Port": "8888"
-      },
-      "rank": 55
+      "rank": 49
     },
     {
       "id": "atom1:rippleexl3d",
@@ -2569,7 +2281,7 @@
         "prefill": "未計測",
         "Port": "8027"
       },
-      "rank": 56
+      "rank": 50
     }
   ]
 }

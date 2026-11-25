@@ -10,10 +10,12 @@
  *      Gitea  http://192.168.0.101:3000/gitadmin/Atom2LLM        README.md
  *      →「## 生成モデル」表（decode / prefill / VRAM は「実行状況」列から抽出）
  *   3. Whitebear2026（Core Ultra 7 270K Plus / RTX 5090・VRAM 32GB / WSL2）
- *      GitHub https://github.com/cliclie/Whitebear2026-WSL2      README.md（プライベート）
- *      →「### 1. サマリー（推論エンジン × モデル × 性能）」表
- *      ※ プライベートのため HTTPS では取得不可。SSH（git@github.com）で shallow clone する。
- *         認証鍵が用意できない環境では `--wb-dir <clone済みパス>` で既存クローンを使う。
+ *      Gitea  http://192.168.0.101:3000/gitadmin/WSL-llm         README.md
+ *      →「## 1. 起動・停止」の起動索引表 + 本文に散在する実測記載
+ *         （本リポジトリは「稼働 LLM モデル諸元・性能一覧」表を持たない。
+ *          索引表の launcher に対応する実測記載がある環境のみを行として採用する）
+ *      ※ GitHub の cliclie/Whitebear2026-WSL2 は 2026-11-07 で停止（archived）。
+ *         2026-11-08 以降は Gitea の WSL-llm が正本。
  *
  * 出力: src/data/articles/llm-bench.json（記事に同梱する静的データ）
  *   - 公開サイトに社内 IP への実行時リクエストは発生させない（ビルド時スナップショット方式）
@@ -21,12 +23,10 @@
  *
  * 使い方:
  *   node scripts/fetch-llm-bench.mjs
- *   node scripts/fetch-llm-bench.mjs --wb-dir C:\path\to\Whitebear2026-WSL2
+ *   node scripts/fetch-llm-bench.mjs --out <path>
  */
 
-import { execFileSync } from 'node:child_process';
-import { promises as fs, readFileSync, rmSync, existsSync, realpathSync } from 'node:fs';
-import os from 'node:os';
+import { promises as fs, existsSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -85,11 +85,12 @@ const MACHINES = [
     gpu: 'NVIDIA RTX 5090 32GB（sm_120・CUDA 13.1 / ドライバ 615.71）',
     ram: '86GB（WSL 割当）',
     memoryKind: 'VRAM',
-    memoryNote: 'アイドル時の VRAM 実測（32GB 中）。Strata 系は RAM に Expert を page-lock する',
-    sourceKind: 'github',
-    sourceUrl: 'https://github.com/cliclie/Whitebear2026-WSL2',
-    cloneUrl: 'git@github.com:cliclie/Whitebear2026-WSL2.git',
-    table: 'summary',
+    memoryNote:
+      'アイドル時の VRAM 実測（32GB 中）。maya は RAM への pinned 値、clef は clef/README.md の実測、Strata 系は本文に測定値の記載なし',
+    sourceKind: 'gitea',
+    sourceUrl: 'http://192.168.0.101:3000/gitadmin/WSL-llm',
+    rawUrl: 'http://192.168.0.101:3000/gitadmin/WSL-llm/raw/main/README.md',
+    table: 'wsl',
   },
 ];
 // HuggingFace の「提供者/モデル名」。README 本文・起動スクリプト・compose に実在する ID のみ。
@@ -114,23 +115,22 @@ const MODEL_IDS = {
   'atom2:qwen38gguf': 'unsloth/Qwen3.8-27B-GGUF',
   'atom2:gptoss': 'openai/gpt-oss-20b',
   'atom2:magn': 'unsloth/Qwen3.8-27B-GGUF',
-  'atom2:qwen38hipfire': 'hipfire-models/qwen3.8-27b',
+  'atom2:hipfire': 'hipfire-models/qwen3.8-27b',
   'atom2:qwen3vl': 'Qwen/Qwen3-VL-8B-Instruct-FP8',
   'atom2:clef': 'Cloudflare/clef-flash',
-  // ---- Whitebear2026（Whitebear2026-WSL2） ----
-  'wb2026:swift40': 'erlidev/Swift-Qwen3.8-27B-EXL3',
-  'wb2026:swift35': 'erlidev/Swift-Qwen3.8-27B-EXL3',
-  'wb2026:swiftqwen38': 'ukisai/Swift-Qwen3.8-27B-NVFP4',
-  'wb2026:mimo': 'prithivMLmods/MiMo-V2.6-Distill-Qwen-9B-FP8',
-  'wb2026:bonsai': 'PrismML-Eng/Bonsai-demo',
-  'wb2026:llmjp': 'llm-jp/llm-jp-4.1-33b-thinking',
-  'wb2026:qwen9': 'TheMelonGod/Qwen3.5-9B-exl3',
-  'wb2026:strata15': 'ukisai/Swift-1.5-Qwen3.8-Flash-Next-GSQ-RCO-IQ2_XS',
-  'wb2026:strataS4': 'nitinpanj/Swift-Qwen3.8-Flash-Next-Q4_0-Q8out-v3-GGUF',
-  'wb2026:strataU4': 'unsloth/Qwen3.8-Flash-Next-GGUF',
+  // 2026-11-25 追加（TensorFold native 2 種と Hibana）。README の `…@<commit>` 接尾は HF のリビジョン表記なので ID から落とす
+  'atom1:qwen38tfm4': 'TensorFold/Qwen3.8-27B-MLX-4bit',
+  'atom1:qwen38tfm8': 'TensorFold/Qwen3.8-27B-MLX-8bit',
+  'atom1:flashnexthibana': 'RadixArk/Qwen3.8-Flash-Next-NVFP4',
+
+  // ---- Whitebear2026（WSL-llm） ----
+  // 2026-11-25 に正本を Gitea WSL-llm へ移行。起動索引表 + 本文に実測記載がある環境のみが
+  // 行になるため、旧 GitHub 表（2026-11-07 で停止）由来の swift40 / swift35 / swiftqwen38 /
+  // mimo / bonsai / llmjp / qwen9 / strata15 / strataS4 / strataU4 / strataC1 / strataD4 の
+  // ID は行が生成されないので削除した。README に提供者名が略記なしで実在するものだけ登録する。
   'wb2026:strataQ3': 'ukisai/Swift-1.5-Qwen3.8-Flash-Next-GSQ-RCO-GGUF',
-  'wb2026:strataC1': 'ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF',
-  'wb2026:strataD4': 'ISTA-DASLab/DeepSeek-V4.1-Flash-1017',
+  'wb2026:strataI2': 'thinkingmachines/Inkling-2-Mini',
+  'wb2026:clef': 'Cloudflare/clef-flash',
 };
 
 // 推論エンジン名の候補（複合表記は parseEngine で寄せる）
@@ -522,31 +522,11 @@ async function fetchGiteaReadme(machine) {
   return res.text();
 }
 
-/**
- * GitHub（プライベート）の README を取得する。
- * SSH で shallow clone → 読み取り後に削除する。
- * @param {string} cloneUrl
- * @param {string} [reuseDir] 既存クローンディレクトリ（指定時は clone しない）
- */
-function fetchGithubReadme(cloneUrl, reuseDir) {
-  const dir = reuseDir || path.join(os.tmpdir(), 'cresome-llm-bench-' + Date.now());
-  if (!reuseDir) {
-    execFileSync('git', ['clone', '--quiet', '--depth', '1', '--single-branch', cloneUrl, dir], {
-      stdio: ['ignore', 'ignore', 'inherit'],
-    });
-  }
-  try {
-    return readFileSync(path.join(dir, 'README.md'), 'utf8');
-  } finally {
-    if (!reuseDir) rmSync(dir, { recursive: true, force: true });
-  }
-}
-
 // ============================================================
 // 行ビルダー
 // ============================================================
 
-/** DGXSparkLLMEnv / Whitebear2026-WSL2 の「1. サマリー（推論エンジン × モデル × 性能）」表 */
+/** DGXSparkLLMEnv の「1. サマリー（推論エンジン × モデル × 性能）」表 */
 function buildSummaryRows(machine, table, md) {
   const h = table.header;
   const i = {
@@ -586,7 +566,10 @@ function buildSummaryRows(machine, table, md) {
     const { model, weights } = splitModelCell(prev.model);
     const eng = parseEngine(prev.engine);
     const weightSize = parseSize(prev.weight, 'weight');
-    const memory = parseSize(prev.memory, 'memory');
+    // 「使用 62 GiB / MemAvailable 59 GB」のように使用量と空きを併記するセルは、
+    // 本機の定義（MemAvailable ＝ 空き）に合わせて空き側を採る
+    const memLabel = /使用[^/]*\/[^/]*MemAvailable/i.test(prev.memory) ? 'MemAvailable' : '';
+    const memory = parseSize(prev.memory, 'memory', memLabel);
 
     rows.push({
       id: `${machine.key}:${launcher}`,
@@ -716,6 +699,278 @@ function buildAtom2Rows(machine, table) {
   return rows;
 }
 
+/** 起動索引表に載るが測定対象外の情報コマンド（`llm` / `unloadllm`） */
+const WSL_INFO_COMMANDS = ['llm', 'unloadllm'];
+
+/**
+ * WSL-llm（Whitebear2026）は「稼働 LLM モデル諸元・性能一覧」表を持たない。
+ * 「## 1. 起動・停止」の起動索引表から環境を洗い出し、README 本文に実測記載があるものだけを行にする
+ * （記載の無い mimo / swift40 / tabby / bonsai / llmjp 等は行を作らない＝2026-11-25 の運用決定）。
+ *
+ * 本文からの抽出箇所（README の記載形式に依存する。形式を変えたらここも直す）:
+ *   1. 索引表「対象」列に直接書かれた実測値 … `maya`（decode 26.2 tok/s・pinned 47.6GB）
+ *   2. 「`strataq3` **178.41** / `strataK4` **55.35** / … T/s」= 名前と値が対で並ぶ decode
+ *   3. 直後の「3.5K prompt の prefill も …（2232 / 1762 / 1438）」= 2 の出現順で対応付ける
+ *   4. 「単体ベンチ: prefill 1,989 / decode 80.9 tok/s」= 同じ節に出現する launcher に紐づける
+ *   5. 「| モード | 重み | DL | 狙い | … |」表 = strataK4 / strataN4 の重み
+ */
+function buildWslRows(machine, md, table) {
+  const h = table.header;
+  const i = {
+    launcher: colIndex(h, ['コマンド']),
+    target: colIndex(h, ['対象']),
+    port: colIndex(h, ['ポート']),
+    body: colIndex(h, ['実体']),
+  };
+  const lines = md.split(/\r?\n/);
+  const plain = lines.map((l) => stripMd(l));
+
+  // ---- 索引表 → 環境（Strata 9 モードのように複数列挙のセルは分割する） ----
+  const envs = [];
+  const byLauncher = new Map();
+  for (const raw of table.rows) {
+    const target = stripMd(raw[i.target]);
+    const port = (stripMd(raw[i.port]).match(/\d{4,5}/) || [''])[0];
+    const body = stripMd(raw[i.body]);
+    const tokens = [...new Set((raw[i.launcher] || '').match(/`([A-Za-z][A-Za-z0-9_]*)`/g) || [])];
+    for (const token of tokens) {
+      const launcher = token.replace(/`/g, '');
+      if (WSL_INFO_COMMANDS.includes(launcher) || byLauncher.has(launcher)) continue;
+      const env = { launcher, target, port, body, tokens: tokens.length };
+      envs.push(env);
+      byLauncher.set(launcher, env);
+    }
+  }
+  if (envs.length === 0) return [];
+
+  // 索引表は `strataQ3`、本文は `strataq3` のように大文字小文字が揺れるので小文字で引く
+  const lowerName = new Map();
+  for (const name of byLauncher.keys()) lowerName.set(name.toLowerCase(), name);
+  const namesByLength = [...byLauncher.keys()].sort((a, b) => b.length - a.length);
+
+  /** 名前が完全一致（前後が名前文字でない）で含まれるか */
+  const hasWord = (text, name) => {
+    const lower = text.toLowerCase();
+    const key = name.toLowerCase();
+    let from = 0;
+    let at = -1;
+    while ((at = lower.indexOf(key, from)) >= 0) {
+      const before = at === 0 ? '' : lower[at - 1];
+      const after = at + key.length >= lower.length ? '' : lower[at + key.length];
+      if (!/[a-z0-9_]/.test(before) && !/[a-z0-9_]/.test(after)) return true;
+      from = at + key.length;
+    }
+    return false;
+  };
+  /** テキスト中に最初に出現する launcher 名（長い名前から照会） */
+  const findLauncher = (text) => {
+    for (const name of namesByLength) if (hasWord(text, name)) return name;
+    return null;
+  };
+
+  // ---- 性能記載の収集 ----
+  const perf = new Map();
+  const put = (launcher, patch) => {
+    if (!byLauncher.has(launcher)) return;
+    perf.set(launcher, Object.assign(perf.get(launcher) || {}, patch));
+  };
+
+  // 1. 索引表「対象」列に埋まった実測値
+  for (const env of envs) {
+    const dec = env.target.match(/decode\s*(\d+(?:\.\d+)?)\s*(?:T|tok)\/s/i);
+    if (dec) put(env.launcher, { decode: toNum(dec[1]), decodeText: dec[0].replace(/\s+/g, ' ') });
+  }
+
+  let decodeOrder = [];
+  plain.forEach((text, idx) => {
+    // 2. 名前と値が対で並ぶ decode 記載（同じ行に 2 件以上、`T/s` 表記を要求）
+    const pairs = [...text.matchAll(/(strata[A-Za-z0-9]*)\s+(\d+(?:\.\d+)?)(?=[^0-9]|$)/g)].filter(
+      (m) => lowerName.has(m[1].toLowerCase())
+    );
+    if (pairs.length >= 2 && /T\/s/.test(text)) {
+      decodeOrder = [];
+      for (const p of pairs) {
+        const name = lowerName.get(p[1].toLowerCase());
+        const v = toNum(p[2]);
+        if (!name || v === null) continue;
+        put(name, { decode: v, decodeText: p[2] + ' T/s' });
+        decodeOrder.push(name);
+      }
+      return;
+    }
+
+    // 3. 直後の prefill 記載は 2 の出現順で対応付ける（「3.5K prompt の prefill も …（2232 / 1762 / 1438）」）
+    const pf = text.match(/prefill[^（(]*[（(](\d[\d,]*(?:\s*\/\s*\d[\d,]*)+)[）)]/);
+    if (pf && decodeOrder.length) {
+      const cond = (text.match(/([0-9][\d.]*K prompt)\s*の\s*prefill/) || [])[1];
+      pf[1].split('/').forEach((s, k) => {
+        const v = toNum(s.trim());
+        const name = decodeOrder[k];
+        if (!name || v === null) return;
+        put(name, {
+          prefill: v,
+          prefillText: s.trim() + ' T/s' + (cond ? `（${cond}）` : ''),
+        });
+      });
+      return;
+    }
+
+    // 4. 「単体ベンチ: prefill X / decode Y tok/s」は同じ節の launcher に紐づける
+    const solo = text.match(/単体ベンチ[:：]\s*prefill\s*([\d,]+)\s*\/\s*decode\s*([\d.]+)\s*(?:T|tok)\/s/i);
+    if (solo) {
+      let start = 0;
+      for (let k = idx - 1; k >= 0; k--) if (/^#{1,6}\s/.test(plain[k])) { start = k + 1; break; }
+      let end = plain.length;
+      for (let k = idx + 1; k < plain.length; k++) if (/^#{1,6}\s/.test(plain[k])) { end = k; break; }
+      const name = findLauncher(plain.slice(start, end).join('\n'));
+      if (name)
+        put(name, {
+          prefill: toNum(solo[1]),
+          prefillText: 'prefill ' + solo[1] + ' T/s',
+          decode: toNum(solo[2]),
+          decodeText: 'decode ' + solo[2] + ' T/s',
+        });
+    }
+  });
+
+  // 5. 重み（`| モード | 重み | DL | 狙い | … |` 表）
+  const weights = new Map();
+  const wTable = extractTable(md, ['モード', '重み', 'DL']);
+  if (wTable) {
+    const wi = {
+      launcher: colIndex(wTable.header, ['モード']),
+      weight: colIndex(wTable.header, ['重み']),
+      dl: colIndex(wTable.header, ['DL']),
+    };
+    for (const raw of wTable.rows) {
+      const name = findLauncher(stripMd(raw[wi.launcher]));
+      if (!name) continue;
+      weights.set(name, {
+        weights: stripMd(raw[wi.weight]),
+        weightSize: parseSize(raw[wi.dl], 'weight').value,
+      });
+    }
+  }
+  // Inkling 系（索引表で「`strataI2` = …」と名指しされ、セルに `SQ-` と書く環境）の重みは
+  // 本文の「SQ-20 19.35 GB + Vision 0.64 GB」から拾う（Strata 9 モード共通セルなので名指し限定）
+  const sqEnvs = envs.filter(
+    (e) => /SQ-\d+/.test(e.target) && new RegExp(e.launcher + '\\s*=', 'i').test(e.target)
+  );
+  if (sqEnvs.length > 0) {
+    const sqLine =
+      plain.find((t) => /SQ-\d+\s+[\d.]+\s*GB.*Vision\s+[\d.]+\s*GB/.test(t)) ||
+      plain.find((t) => /SQ-\d+\s+[\d.]+\s*GB/.test(t));
+    const m = sqLine && sqLine.match(/SQ-\d+\s+[\d.]+\s*GB(?:.*?Vision\s+[\d.]+\s*GB)?/);
+    if (m) {
+      const text = m[0].replace(/\s+/g, ' ').trim();
+      const size = parseSize(text, 'weight').value;
+      for (const e of sqEnvs) weights.set(e.launcher, { weights: text, weightSize: size });
+    }
+  }
+
+  /** 索引表セルの「名（…）」頭＝最初の括弧が閉じる位置まで */
+  const headFragment = (text) => {
+    const m = text.match(/^[^（(]*[（(][^）)]*[）)]/);
+    return (m ? m[0] : text.split('・')[0]).trim();
+  };
+
+  // ---- 行生成（実測記載がある環境 / decision 専用環境のみ） ----
+  const rows = [];
+  for (const env of envs) {
+    const p = perf.get(env.launcher) || {};
+    const decision = /decision/i.test(env.target);
+    if (p.decode === undefined && p.prefill === undefined && !decision) continue;
+
+    // Strata 9 モードは 1 セルに全モードの記載が並ぶので、この launcher を名指しする文だけを採用する
+    const scope = env.target
+      .split('。')
+      .filter((seg) => hasWord(seg, env.launcher))
+      .join('。');
+
+    // モデル名は「`strataI2` = Inkling-2-Mini SQ-20（…）」を優先し、単独行のセルなら先頭を採用する
+    const eq = env.target.match(new RegExp(env.launcher + '\\s*=\\s*([^（()]+)', 'i'));
+    const head = splitModelCell(headFragment(env.target));
+    const model = eq
+      ? eq[1].replace(/\s+/g, ' ').trim()
+      : env.tokens === 1
+      ? head.model || null
+      : null;
+
+    const engScope = scope || env.target;
+    const eng = parseEngine(engScope);
+    const known = ENGINE_NAMES.some((n) =>
+      new RegExp(n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(engScope)
+    );
+    const engine = known ? eng.engine : head.model || env.launcher;
+    // 版はエンジン名の直後に限って採る。Strata の専用エンジン版は「専用エンジン `strata-inkling` 0.1.66」
+    // のようにエンジン名と版が離れて書くため、`strata-<name> <version>` を補助として探す
+    const engineVersion =
+      (known &&
+        scope &&
+        (eng.engineVersion || (scope.match(/strata-[a-z0-9]+\s+(\d+\.\d+(?:\.\d+)?)/i) || [])[1])) ||
+      '';
+
+    // コンテキストは「この launcher を名指しする文」→ 無ければセル全体の最初の ctx 記載
+    const ctxTextOf = (text) => (text.match(/(ctx-size|ctx サイズ|ctx|実効入力)[^・。)）（(/]*/) || [''])[0];
+    const ctxText = ctxTextOf(scope) || ctxTextOf(env.target);
+    const ctx = parseContext(ctxText.replace(/b\d{4,}/g, ' '));
+    const mem =
+      ['VRAM', 'pinned', '実測']
+        .map((label) => parseSize(scope, 'memory', label))
+        .find((x) => x.value !== null) || { value: null, unit: '' };
+    const w = weights.get(env.launcher);
+    // 索引表セルの括弧内は「・」で運用語が並ぶため、重みは先頭断片だけ採用する。
+    // 複数 launcher 共通のセル（Strata 9 モード行）の括弧内は個別諸元ではないので使わない。
+    const weightsText =
+      (w && w.weights) ||
+      (env.tokens === 1 ? (head.weights || '').split('・')[0].trim() : '') ||
+      '—';
+
+    rows.push({
+      id: `${machine.key}:${env.launcher}`,
+      machineKey: machine.key,
+      machine: machine.machineShort,
+      launcher: env.launcher,
+      model,
+      modelId: MODEL_IDS[`${machine.key}:${env.launcher}`] || null,
+      weights: weightsText,
+      weightSize: w ? w.weightSize : parseSize(weightsText, 'weight').value,
+      decode: p.decode === undefined ? null : p.decode,
+      decodeText: p.decodeText || '—',
+      prefill: p.prefill === undefined ? null : p.prefill,
+      prefillText: p.prefillText || '—',
+      context: ctx,
+      contextText: ctxText || (ctx ? ctx.toLocaleString('en-US') : '—'),
+      memoryKind: machine.memoryKind,
+      memoryNote: machine.memoryNote,
+      memory: mem.value,
+      memoryText: mem.value ? mem.value + 'GB（実測）' : '—',
+      engine,
+      engineVersion,
+      engineText: env.target,
+      speculative: '—',
+      measuredAt: '',
+      note: '',
+      port: env.port,
+      os: machine.os,
+      cpu: machine.cpu,
+      ram: machine.ram,
+      gpu: machine.gpu,
+      sourceUrl: PUBLISH_SOURCE_URL ? machine.sourceUrl : null,
+      raw: {
+        ランチャー: env.launcher,
+        対象: env.target,
+        実体: env.body,
+        重み: weightsText,
+        decode: p.decodeText || '—',
+        prefill: p.prefillText || '—',
+        Port: env.port,
+      },
+    });
+  }
+  return rows;
+}
+
 // ============================================================
 // 出力
 // ============================================================
@@ -727,32 +982,38 @@ function argValue(name) {
     : null;
 }
 
+/** 生成日をローカル時刻の YYYY-MM-DD で返す（`toISOString()` は UTC 基準なので、
+ *   JST 朝の実行が前日になる。記事の「更新日」とズレるためローカル日を使う） */
+function localIsoDate(d = new Date()) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/** 公開バンドルに社内アドレスを残さない: 原文表記（engineText / raw など）の 192.168.* を文言に置換する。
+ *  「192.168.0.0/24 限定」のように直後に「限定」が続く README 表記は、接尾も一緒に畳む */
+function scrubLocalAddr(value) {
+  if (typeof value === 'string')
+    return value.replace(/192\.168\.[\d.]+(?:\/\d{1,2})?(?: 限定)?/g, 'LAN 限定');
+  if (Array.isArray(value)) return value.map(scrubLocalAddr);
+  if (value && typeof value === 'object')
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, scrubLocalAddr(v)]));
+  return value;
+}
+
 async function main() {
   const out = argValue('out') ? path.resolve(ROOT, argValue('out')) : DEFAULT_OUT;
-  const wbDir = argValue('wb-dir');
-  const skipGithub = process.argv.includes('--skip-github');
 
   const rows = [];
   const sources = [];
   for (const machine of MACHINES) {
-    let md;
-    if (machine.sourceKind === 'gitea') {
-      console.log('[bench] Gitea 取得: ' + machine.rawUrl);
-      md = await fetchGiteaReadme(machine);
-    } else {
-      if (skipGithub) {
-        console.log('[bench] GitHub をスキップしました（--skip-github）');
-        continue;
-      }
-      console.log(
-        '[bench] GitHub clone: ' + machine.cloneUrl + (wbDir ? '（既存クローン利用: ' + wbDir + '）' : '')
-      );
-      md = fetchGithubReadme(machine.cloneUrl, wbDir);
-    }
+    console.log('[bench] Gitea 取得: ' + machine.rawUrl);
+    const md = await fetchGiteaReadme(machine);
 
     const table =
       machine.table === 'atom2'
         ? extractTable(md, ['切替コマンド', 'エンジン', '最大コンテキスト'])
+        : machine.table === 'wsl'
+        ? extractTable(md, ['コマンド', '対象', 'ポート', '実体'])
         : extractTable(md, ['ランチャー', 'decode', 'prefill']);
     if (!table) {
       throw new Error(
@@ -762,6 +1023,8 @@ async function main() {
     const built =
       machine.table === 'atom2'
         ? buildAtom2Rows(machine, table)
+        : machine.table === 'wsl'
+        ? buildWslRows(machine, md, table)
         : buildSummaryRows(machine, table, md);
     if (built.length === 0) {
       throw new Error(`${machine.sourceUrl} の性能一覧表から行を解析できませんでした`);
@@ -804,10 +1067,13 @@ async function main() {
   rows.length = 0;
   rows.push(...ranked);
 
+  // 原文表記（engineText / raw）に LAN 内アドレスが書かれている機種があるので公開前に置換する
+  for (let i = 0; i < rows.length; i++) rows[i] = scrubLocalAddr(rows[i]);
+
   const data = {
-    generatedAt: new Date().toISOString().slice(0, 10),
+    generatedAt: localIsoDate(),
     note:
-      '自社内のローカルLLM環境 3台で実測した推論性能の一覧。数値は各環境設定リポジトリ README の集計値（decode 500 トークン / prefill 約 10,800 トークン 基準）。環境状態が異なる値は比較できないため、絶対値の比較は同一セッションの対測値に限る。',
+      '自社内のローカルLLM環境 3台で実測した推論性能の一覧。数値は各環境設定リポジトリ README の集計値（decode 500 トークン / prefill 約 10,800 トークン 基準）。環境状態が異なる値は比較できないため、絶対値の比較は同一セッションの対測値に限る。Whitebear2026 の Strata 系は README の別条件（bench_strata.py r7・256 tok 出力、prefill は 3.5K prompt）で、判定専用（decision）モデルの Clef-Flash は生成しないため decode / prefill がありません。',
     machines: MACHINES.map((m) => ({
       key: m.key,
       name: m.machine,
@@ -856,4 +1122,6 @@ export {
   extractTable,
   extractMeasuredDates,
   headerDate,
+  buildWslRows,
+
 };

@@ -37,14 +37,18 @@ npm run bench:fetch
 |---|---|---|
 | AI TOP ATOM（GB10・統合メモリ128GB） | `http://192.168.0.101:3000/gitadmin/DGXSparkLLMEnv` | 「稼働 LLM モデル諸元・性能一覧 → 1. サマリー」 |
 | whitebearatom2（R9700・VRAM32GB / RAM32GB） | `http://192.168.0.101:3000/gitadmin/Atom2LLM` | 「生成モデル」（decode / prefill / VRAM は「実行状況」列から抽出） |
-| Whitebear2026（RTX 5090・WSL2 / RAM86GB割当） | `https://github.com/cliclie/Whitebear2026-WSL2` | 「稼働 LLM モデル諸元・性能一覧 → 1. サマリー」 |
+| Whitebear2026（RTX 5090・WSL2 / RAM86GB割当） | `http://192.168.0.101:3000/gitadmin/WSL-llm` | 性能一覧表は**持たない**。起動索引表＋本文の実測記載（`buildWslRows`） |
 
-- Gitea 2 台は匿名 HTTP（`/raw/main/README.md`）。GitHub はプライベートなので **SSH（`git@github.com`）で shallow clone** して読みます（鍵は `~/.ssh/id_ed25519.pub` を GitHub へ登録済み。`ssh -T git@github.com` が `Hi cliclie!` を返すこと）。
-- オプション: `--wb-dir <clone済みパス>`（clone を省略）/ `--skip-github` / `--out <path>`
+- 3 台とも Gitea の匿名 HTTP（`/raw/main/README.md`）。旧 GitHub `cliclie/Whitebear2026-WSL2` は 2026-11-07 で停止（archived）で、2026-11-08 以降は Gitea の `WSL-llm` が正本。
+- オプション: `--out <path>`（既定は `src/data/articles/llm-bench.json`）
 - **ビルド時スナップショット方式**: 公開サイトから社内 IP を実行時に叩きません。生成 JSON をコミットし、バンドルに焼き込みます。
 - 失敗時: 表が見つからない・0 行なら非ゼロ終了し、既存 JSON を保持します（README 側の表構成変更の検知）。
+- **Whitebear2026 は表からでなく本文から抽出します**（`buildWslRows`）。起動索引表の launcher に対し、
+  ①索引表「対象」列の実測値 ②「`strataq3` **178.41** / … T/s」③直後の「prefill も …（A / B / C）」（②の出現順で対応）
+  ④「単体ベンチ: prefill X / decode Y tok/s」（同じ節の launcher に紐づけ）⑤「| モード | 重み | DL |」表
+  を読みます。**本文に実測記載の無い環境（mimo / swift40 / tabby / bonsai / llmjp など）は行を作りません**（2026-11-25 の運用決定）。
 - `main()` は直接実行時のみ走り、パース関数は export しているので単体で検証できます。
-- 記事の遅延読み込み: JSON は `src/data/articles/useBench.js` の動的 `import()` で取得します（別チャンク ≈90 kB / gzip 17.7 kB。静的 import だと three.js 由来のメインバンドルに載る）。
+- 記事の遅延読み込み: JSON は `src/data/articles/useBench.js` の動的 `import()` で取得します（別チャンク ≈87 kB / gzip 17.3 kB。静的 import だと three.js 由来のメインバンドルに載る）。
 
 ### 出典 URL を載せるかどうか
 
@@ -78,7 +82,7 @@ npm run bench:fetch
   - 同じ名前の再計測が複数書かれると**後勝ち**（`strataQ3` = 2026-10-25）
   - whitebearatom2 は「測定日」注記が無いため、表ヘッダー「実行状況（2026-10-17 時点）」を `headerDate` で全行に適用
 - `note`（備考）は自動生成しません（既定は空欄）。
-- **手動追記は再生成でも消えません**: `fetch-llm-bench.mjs` が既存 JSON を読み、`note` は常時、`measuredAt` は自動抽出できなかった行について既存値を維持します。`Whitebear2026` の `strata15` / `strataS4` / `strataU4` / `llmjp` / `qwen9` / `exl` の計測日は、README に個別記載が無いため JSON を直接編集して補ってください。`whitebearatom2` の `strata`（2026-10-26 追加）は表ヘッダーの日付が更新されないため、JSON で直接補正していましたが、2026-11-07 にヘッダーが 2026-11-01 へ更新されたため自動抽出されるようになり手動補正は不要になりました。
+- **手動追記は再生成でも消えません**: `fetch-llm-bench.mjs` が既存 JSON を読み、`note` は常時、`measuredAt` は自動抽出できなかった行について既存値を維持します。`Whitebear2026` の 6 行（`strataQ3` / `strataK4` / `strataN4` / `strataI2` / `maya` / `clef`）は、正本を Gitea `WSL-llm` へ移した 2026-11-25 時点で README に「測定日」注記が無いため `measuredAt` が空欄になります（根拠は各節の日付: strata 系と `clef` = 2026-11-23、`maya` = 2026-11-07 相当）。`patch-bench.mjs` の FIX で補ってください。`whitebearatom2` の `strata`（2026-10-26 追加）は表ヘッダーの日付が更新されないため、JSON で直接補正していましたが、2026-11-07 にヘッダーが 2026-11-01 へ更新されたため自動抽出されるようになり手動補正は不要になりました。
 - **全環境注記の展開で古い日付が塗られる行に注意**（2026-11-14 確認）: AI TOP ATOM の「測定日: 2026-09-24（全環境一括）」注記は、注記より後に追加された行（Ripple / Nanbeige / SC 量子化 / 11-10 再計測で更新された行）にも 2026-09-24 を展開して塗ります。README の「2026-11-10 再計測」節と各所の「2026-11-01 / 11-09 実測」記載に合わせて、再生成後に JSON 側で上書き補正する（抽出側が「成功」と判定するため既存値維持ロジックが効かない）。対象は検証履歴の 2026-11-14 項参照。
 - **README の「測定日」注記に名前が並ばない節も 09-24 に塗られる**（2026-11-18 確認）: 「**2026-11-14 実測（Unsloth Dynamic 3.1 GGUF 4 環境）**」のような節は
   `extractMeasuredDates` の対象行（`測定日` を含む行）ではないため、全環境注記の 2026-09-24 が残る。再生成後に JSON で上書き補正し、
@@ -92,6 +96,8 @@ npm run bench:fetch
 - AI TOP ATOM の「使用メモリ」は README の定義どおり**アイドル時の MemAvailable（空き）**で、値が大きいほど余裕があります（機種ごとに `.bench-mem-kind` と記事下部の凡例で明示）。
 - 数値は各 README の実測集計値です。環境状態が違う値の絶対比較はできないため、一覧・記事本文に注記を置いています。
 - README 側の表ヘッダー名（`ランチャー` / `decode` / `prefill` / `切替コマンド` 等）を変えると抽出に失敗します（その場合は非ゼロ終了し、既存 JSON はそのまま残ります）。
+- **Whitebear2026 は本文抽出**のため、README の記載形式（「`strataq3` **178.41** / … T/s」「単体ベンチ: prefill X / decode Y tok/s」「\| モード \| 重み \| DL \|」表）を変えると、**行が減る・値が落ちる**形で静かに壊れます。表構成のような非ゼロ終了では検知できないので、再生成後に wb2026 が 6 行あることと数値を目視確認してください（2026-11-25 時点）。
+- 生成 JSON は `scrubLocalAddr()` で `192.168.*` を「LAN 限定」に置換します。`PUBLISH_SOURCE_URL` が `false` でも、README 本文（索引表セルの FW 記述など）が `engineText` 経由で入るため（2026-11-25 に dist へ漏れた実測あり）。
 
 ## 検証履歴
 
@@ -160,3 +166,25 @@ npm run bench:fetch
 - 記事 lead の「みどころは～」段落を 2026-11-23 版に刷新（Clef-Flash の特徴 + 前回 GGUF A/B の結果要約）。記事日を 2026-11-23 に更新
 - `npm run build` 成功（llm-bench チャンク 92.5 kB / gzip 17.96 kB）、dist に `192.168` が 0 件。puppeteer（`vite preview`・1440px）: `nav-sub = 2026-11-23`、`article-date = 更新日 2026-11-23`、lead 2 段落、表 56 行、「56 環境（データ生成日 2026-11-23）」、`tableW = 1591`、`.reveal` の opacity 0 は 0 件。**全 56 行**を逐一行クリックし、表セル（decode / prefill / 計測日 / 備考）と詳細ポップアップを JSON と突合 → ALL PASS（fails 0・js errors 0）
 - 公開: main `3d97867` / publish `49f83e8`（2026-11-23）。本番 `www.cresome.tech` の `index-BRIadnsm.js` に `2026-11-23` と Clef-Flash、`llm-bench-BTu8B71v.js` に `atom2:clef` / `Cloudflare/clef-flash` を確認。公開 JS の `192.168` は 0 件
+
+### 2026-11-25 wb2026 の正本を Gitea `WSL-llm` へ移行（56 → 50 行）
+- `MACHINES.wb2026` を GitHub → Gitea `gitadmin/WSL-llm`（`table: 'wsl'`）へ切替。旧 GitHub `cliclie/Whitebear2026-WSL2` は 2026-11-07 が最終コミット（archived）
+- 同リポジトリは性能一覧表を持たないため、起動索引表＋本文の実測記載から行を組み立てる **`buildWslRows`** を追加（抽出ルールは「データ生成」節に明記。README の記載形式を変えたらそちらも直す）
+- GitHub 取得系を削除: `fetchGithubReadme()`・`cloneUrl`・`--wb-dir`・`--skip-github`（併せて `node:child_process` / `node:os` / `readFileSync` / `rmSync` の import も）。`npm run bench:fetch` は Gitea 3 台の HTTP 取得のみになった
+- wb2026 は **15 行 → 6 行**（`strataQ3` 178.41 / 2232・`strataI2` 80.9 / 1,989・`strataK4` 55.35 / 1762・`strataN4` 25.99 / 1438・`maya` 26.2・`clef` は判定専用で decode / prefill なし）。
+  重複は `strataQ3` の 1 行だけ（decode 100 → 178.41 は README の 2026-11-23 実測が新いため）。**本文に実測記載の無い 14 環境（`mimo` / `swift40` / `swift35` / `swiftqwen38` / `tabby` / `bonsai` / `llmjp` / `qwen9` / `exl` / `strata15` / `strataS4` / `strataU4` / `strataC1` / `strataD4`）は一覧から外れる**
+- MODEL_IDS: wb2026 は `strataQ3` / `strataI2`（`thinkingmachines/Inkling-2-Mini`）/ `clef`（`Cloudflare/clef-flash`）の 3 件だけ残し、行が生成されない 12 件を削除。`strataK4` / `strataN4` / `maya` は README が提供者名を略記（`Maximilian228/…`）または表記しないため null
+- 再生成時に手動 FIX が必要（README 本文に根拠が無いため自動抽出しない）: wb2026 6 行の `measuredAt`（各節の日付が strata 系・clef = 2026-11-23、maya = 2026-11-07 相当）、`clef` の VRAM 23.9GB（`WSL-llm` 本文に未記載。`clef/README.md` 由来）、`strataK4` / `strataN4` の「2026-11-23 に重み削除済み＝機構のみ」備考
+- 検証: `node scripts/fetch-llm-bench.mjs --out ..\scratch\llm-bench.wsl-20261125.json` → atom1 35 / atom2 9 / wb2026 6（計 50 行）を確認したうえで `npm run bench:fetch` を www JSON へ実行した（56 → 50 行）
+- `patch-bench-20261125.mjs` を www JSON へ直接当てる形に変更して FIX 適用: atom1 3 行の計測日 2026-11-25・備考、wb2026 6 行の計測日・備考（`clef` は VRAM 23.9GB を `memory` / `memoryText` で補正。`WSL-llm` 本文に VRAM 記載が無いため由来を明記）
+- 再生成で atom2 全行に表ヘッダー「2026-11-24 更新」が塗られる（README の実行状況は 2026-11-01 確認＋11-07 / 11-24 対測）。FIX で `hipfire` / `qwen38gguf` / `clef` = 2026-11-24、`strata` = 2026-11-07、`qwen38radiance` / `gptoss` = 2026-11-01、`magn` = 2026-10-17、`qwen3vl` = 2026-11-11、`qwen38sglangrocm` = 2026-10-06 に戻し、備考も全行に投入した
+- `generatedAt` を `toISOString()`（UTC 基準）からローカル日付へ変更。JST 朝の生成が前日になり記事の「更新日」とズレるため
+- AI TOP ATOM のメモリ抽出: 「使用 62 GiB / MemAvailable 59 GB」型の併記セルは機種定義（MemAvailable＝空き）に合わせて空き側を採るようにした（`qwen38tfm4` 59GB／`qwen38tfm8` 46GB。従来は使用量側の 66.57 / 80.53 になっていた）
+- `scrubLocalAddr()` を追加: Gitea `WSL-llm` の索引表セル（`clef` の FW 記述）に `192.168.0.0/24` が含まれ、`engineText`（ポップアップの原文表記）経由で dist に漏れた。生成時に `LAN 限定` へ置換する
+- MODEL_IDS: `atom1:qwen38tfm4` / `atom1:qwen38tfm8` / `atom1:flashnexthibana` を追加、`atom2:qwen38hipfire` → `atom2:hipfire`（README のコマンド名変更）
+- 記事更新: 記事日 2026-11-25、lead を 3 段落に刷新（Hibana 120.95・TensorFold 51.75 / 25.84、wb2026 の出典移行と strataQ3 首位 178.41、hipfire 0.4.7）、測定条件欄に「Whitebear2026 の Strata 系は README の別条件」を追加、`wb2026` のメモリ凡例を実態（`maya` は RAM pinned／`clef` は clef/README 由来／Strata 系は記載なし）に更新
+- `npm run build` 成功（llm-bench チャンク 87.06 kB / gzip 17.32 kB）。dist 内の `192.168` は 0 件（生成 JSON も 0 件）
+- puppeteer（`vite preview`・1440px）: `nav-sub = 2026-11-25`、`article-date = 更新日 2026-11-25`、lead 3 段落、表 50 行、「50 環境（データ生成日 2026-11-25）」、`tableW = 1591`、`.reveal` の opacity 0 は 0 件。**全 50 行**を逐一行クリックし、表セル（decode / prefill / 計測日 / 備考）と詳細ポップアップを JSON と突合 → ALL PASS（fails 0・js errors 0）
+- 意図的な空欄: `wb2026:maya` の計測日（README に記載なし）と `atom1:rippleexl3d`（未計測）。モデル名が「—」になるのは `wb2026:strataQ3` / `strataK4` / `strataN4` で、Gitea `WSL-llm` 本文に個別のモデル表記が無いため（HuggingFace 欄は README に実在する ID のみ）
+
+
